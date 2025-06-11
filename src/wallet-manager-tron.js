@@ -14,17 +14,10 @@
 
 'use strict'
 
-<<<<<<< HEAD
 import TronWeb from 'tronweb'
 import sodium from 'sodium-universal'
 import WalletManager from '@wdk/wallet'
 import WalletAccountTron from './wallet-account-tron.js'
-=======
-import TronWeb from "tronweb";
-import sodium from "sodium-universal";
-import WalletManager from "@wdk/wallet";
-import WalletAccountTron from "./wallet-account-tron.js";
->>>>>>> 5a5f381ccf1d4385c7d31dfddc70e4d78605f4c6
 
 const FEE_RATE_NORMAL_MULTIPLIER = 1.1
 const FEE_RATE_FAST_MULTIPLIER = 2.0
@@ -117,19 +110,11 @@ export default class WalletManagerTron extends WalletManager {
   }
 
   /**
-<<<<<<< HEAD
    * Disposes the wallet manager, erasing the seed buffer and cleaning up provider connections.
    */
   dispose () {
     for (const account of this.#accounts) account.dispose()
     this.#accounts.clear()
-=======
-   * Disposes all the wallet accounts, and erases their private keys from the memory.
-   */
-  dispose() {
-    for (const account of this.#accounts) account.dispose();
-    this.#accounts.clear();
->>>>>>> 5a5f381ccf1d4385c7d31dfddc70e4d78605f4c6
 
     sodium.sodium_memzero(this.seed)
     this.seed = null
