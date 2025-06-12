@@ -14,23 +14,13 @@
 
 'use strict'
 
-<<<<<<< HEAD
 import TronWeb from 'tronweb'
 import { getBytesCopy } from 'ethers'
 import sodium from 'sodium-universal'
-import WalletAccount from '@wdk/wallet'
+import { IWalletAccount } from '@wdk/wallet'
 import { keccak_256 as keccak256 } from '@noble/hashes/sha3'
-import MemorySafeSigningKey from './memory-safe/signing-key.js'
-import { derivePrivateKeyBuffer } from './memory-safe/utils.js'
-=======
-import TronWeb from "tronweb";
-import { getBytesCopy } from "ethers";
-import sodium from "sodium-universal";
-import WalletAccount from "@wdk/wallet";
-import { keccak_256 as keccak256 } from "@noble/hashes/sha3";
-import { CustomSigningKey } from "./signer/custom-signing-key.js";
-import { derivePrivateKeyBuffer } from "./signer/utils.js";
->>>>>>> 5a5f381ccf1d4385c7d31dfddc70e4d78605f4c6
+import { CustomSigningKey } from './signer/custom-signing-key.js'
+import { derivePrivateKeyBuffer } from './signer/utils.js'
 
 /** @typedef {import('./wallet-account-tron.d.ts').TronTransactionResult} TronTransactionResult */
 /** @typedef {import('./wallet-account-tron.d.ts').TronTransaction} TronTransaction */
@@ -44,7 +34,7 @@ import { derivePrivateKeyBuffer } from "./signer/utils.js";
 
 const BIP_44_TRON_DERIVATION_PATH_PREFIX = "m/44'/195'"
 
-export default class WalletAccountTron extends WalletAccount {
+export default class WalletAccountTron extends IWalletAccount {
   #signingKey
   #path
   #tronWeb
@@ -59,17 +49,10 @@ export default class WalletAccountTron extends WalletAccount {
    * @param {string} path - The BIP-44 derivation path (e.g. "0'/0/0").
    * @param {TronWalletConfig} [config] - The configuration object.
    */
-<<<<<<< HEAD
   constructor (seed, path, config = {}) {
     super(seed)
 
     const { rpcUrl } = config
-=======
-  constructor(seed, path, config = {}) {
-    super(seed);
-
-    const { rpcUrl } = config;
->>>>>>> 5a5f381ccf1d4385c7d31dfddc70e4d78605f4c6
 
     this.#tronWeb = new TronWeb({
       fullHost: rpcUrl || 'https://api.trongrid.io'
@@ -91,7 +74,7 @@ export default class WalletAccountTron extends WalletAccount {
       fullPath
     )
 
-    this.#signingKey = new MemorySafeSigningKey(this.#privateKeyBuffer)
+    this.#signingKey = new CustomSigningKey(this.#privateKeyBuffer)
   }
 
   /**
@@ -136,19 +119,11 @@ export default class WalletAccountTron extends WalletAccount {
     // Compute keccak-256 hash
     const hash = keccak256(pubKeyNoPrefix)
     // Take last 20 bytes
-<<<<<<< HEAD
-    const ethAddress = hash.slice(12)
-    // Convert to hex
-    const ethAddressHex = '41' + Buffer.from(ethAddress).toString('hex')
-    // Convert to base58
-    return this.#tronWeb.address.fromHex(ethAddressHex)
-=======
-    const tronAddress = hash.slice(12);
+    const tronAddress = hash.slice(12)
     // Convert to hex with Tron prefix (41)
-    const tronAddressHex = "41" + Buffer.from(tronAddress).toString("hex");
+    const tronAddressHex = '41' + Buffer.from(tronAddress).toString('hex')
     // Convert to base58
-    return this.#tronWeb.address.fromHex(tronAddressHex);
->>>>>>> 5a5f381ccf1d4385c7d31dfddc70e4d78605f4c6
+    return this.#tronWeb.address.fromHex(tronAddressHex)
   }
 
   /**
@@ -246,6 +221,7 @@ export default class WalletAccountTron extends WalletAccount {
       return false
     }
   }
+
   /**
    * Sends a transaction.
    * @param {TronTransaction} tx - The transaction.
@@ -268,7 +244,7 @@ export default class WalletAccountTron extends WalletAccount {
       // Calculate fee before sending
       const fee = await this.#calculateTransactionCost(
         transaction.raw_data_hex
-      );
+      )
 
       // Sign using our custom wallet's signTransaction method
       const signedTransaction = await this.#signTransaction(transaction)
@@ -286,11 +262,7 @@ export default class WalletAccountTron extends WalletAccount {
         )
       }
 
-<<<<<<< HEAD
-      return result.txid
-=======
-      return { hash: result.txid, fee };
->>>>>>> 5a5f381ccf1d4385c7d31dfddc70e4d78605f4c6
+      return { hash: result.txid, fee }
     } catch (error) {
       throw new Error(
         `Failed to send transaction: ${error.message || JSON.stringify(error)}`
@@ -304,13 +276,8 @@ export default class WalletAccountTron extends WalletAccount {
    * @param {TronTransaction} tx - The transaction to quote.
    * @returns {Promise<Omit<TronTransactionResult, "hash">>} The transaction's quotes.
    */
-<<<<<<< HEAD
-  async quoteTransaction (tx) {
+  async quoteSendTransaction (tx) {
     this.#checkProviderConnection()
-=======
-  async quoteSendTransaction(tx) {
-    this.#checkProviderConnection();
->>>>>>> 5a5f381ccf1d4385c7d31dfddc70e4d78605f4c6
 
     const { to, value } = tx
     const from = await this.getAddress()
@@ -321,12 +288,8 @@ export default class WalletAccountTron extends WalletAccount {
       from
     )
 
-<<<<<<< HEAD
-    return this.#calculateTransactionCost(transaction.raw_data_hex)
-=======
-    const fee = await this.#calculateTransactionCost(transaction.raw_data_hex);
-    return { hash: null, fee };
->>>>>>> 5a5f381ccf1d4385c7d31dfddc70e4d78605f4c6
+    const fee = await this.#calculateTransactionCost(transaction.raw_data_hex)
+    return { hash: null, fee }
   }
 
   /**
@@ -342,42 +305,23 @@ export default class WalletAccountTron extends WalletAccount {
     const hexFrom = this.#tronWeb.address.toHex(from)
     const hexRecipient = this.#tronWeb.address.toHex(recipient)
 
-<<<<<<< HEAD
-    // Estimate gas cost before sending
-    const { gasCost } = await this.quoteTransfer(options)
+    // Estimate fee before sending
+    const { fee } = await this.quoteTransfer(options)
 
     // Build the unsigned transaction
     const parameter = [
       { type: 'address', value: hexRecipient },
       { type: 'uint256', value: amount }
     ]
-    const txResult = await this.#tronWeb.transactionBuilder.triggerSmartContract(
-      token,
-      'transfer(address,uint256)',
-      { feeLimit: 1000000000, callValue: 0 },
-      parameter,
-      hexFrom
-    )
-    const unsignedTx = txResult.transaction
-=======
-    // Estimate fee before sending
-    const { fee } = await this.quoteTransfer(options);
-
-    // Build the unsigned transaction
-    const parameter = [
-      { type: "address", value: hexRecipient },
-      { type: "uint256", value: amount },
-    ];
     const txResult =
       await this.#tronWeb.transactionBuilder.triggerSmartContract(
         token,
-        "transfer(address,uint256)",
+        'transfer(address,uint256)',
         { feeLimit: 1000000000, callValue: 0 },
         parameter,
         hexFrom
-      );
-    const unsignedTx = txResult.transaction;
->>>>>>> 5a5f381ccf1d4385c7d31dfddc70e4d78605f4c6
+      )
+    const unsignedTx = txResult.transaction
 
     // Sign the transaction
     const signature = await this.#signingKey.sign(unsignedTx.txID)
@@ -394,11 +338,7 @@ export default class WalletAccountTron extends WalletAccount {
       )
     }
 
-<<<<<<< HEAD
-    return { hash: result.txid, gasCost }
-=======
-    return { hash: result.txid, fee };
->>>>>>> 5a5f381ccf1d4385c7d31dfddc70e4d78605f4c6
+    return { hash: result.txid, fee }
   }
 
   /**
@@ -429,11 +369,7 @@ export default class WalletAccountTron extends WalletAccount {
       transaction.transaction.raw_data_hex
     )
 
-<<<<<<< HEAD
-    return { hash: null, gasCost }
-=======
-    return { hash: null, fee };
->>>>>>> 5a5f381ccf1d4385c7d31dfddc70e4d78605f4c6
+    return { hash: null, fee }
   }
 
   /**
@@ -520,17 +456,10 @@ export default class WalletAccountTron extends WalletAccount {
   /**
    * Disposes the wallet account, and erases the private key from the memory.
    */
-<<<<<<< HEAD
   dispose () {
     sodium.sodium_memzero(this.#privateKeyBuffer)
     sodium.sodium_memzero(this.#hmacOutputBuffer)
     sodium.sodium_memzero(this.#derivationDataBuffer)
-=======
-  dispose() {
-    sodium.sodium_memzero(this.#privateKeyBuffer);
-    sodium.sodium_memzero(this.#hmacOutputBuffer);
-    sodium.sodium_memzero(this.#derivationDataBuffer);
->>>>>>> 5a5f381ccf1d4385c7d31dfddc70e4d78605f4c6
 
     this.#privateKeyBuffer = null
     this.#hmacOutputBuffer = null
