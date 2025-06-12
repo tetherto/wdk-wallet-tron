@@ -15,7 +15,7 @@
 'use strict'
 
 import { hmac } from '@noble/hashes/hmac'
-import { sha512 } from '@noble/hashes/sha512'
+import { sha512 } from '@noble/hashes/sha2'
 import * as secp256k1 from '@noble/secp256k1'
 
 /** Constants for BIP32 key derivation */

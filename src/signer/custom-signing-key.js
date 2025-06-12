@@ -17,7 +17,7 @@
 import { secp256k1 } from '@noble/curves/secp256k1'
 import { SigningKey } from 'ethers'
 
-export default class MemorySafeSigningKey extends SigningKey {
+export class CustomSigningKey extends SigningKey {
   #privateKeyBuffer
 
   constructor (privateKeyBuffer) {

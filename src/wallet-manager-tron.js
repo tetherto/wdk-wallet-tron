@@ -110,7 +110,7 @@ export default class WalletManagerTron extends WalletManager {
   }
 
   /**
-   * Disposes the wallet manager, erasing the seed buffer and cleaning up provider connections.
+   * Disposes all the wallet accounts, and erases their private keys from the memory.
    */
   dispose () {
     for (const account of this.#accounts) account.dispose()
