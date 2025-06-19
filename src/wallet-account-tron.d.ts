@@ -146,5 +146,5 @@ export type TronWalletConfig = {
     /**
      * - The rpc url of the provider.
      */
-    rpcUrl?: string;
+    provider?: string;
 };
