@@ -38,10 +38,10 @@ export default class WalletManagerTron extends AbstractWalletManager {
     super(seed)
     this.#accounts = new Set()
 
-    const { rpcUrl } = config
+    const { provider } = config
 
     this.#tronWeb = new TronWeb({
-      fullHost: rpcUrl || 'https://api.trongrid.io'
+      fullHost: provider || 'https://api.trongrid.io'
     })
   }
 
@@ -71,7 +71,7 @@ export default class WalletManagerTron extends AbstractWalletManager {
    */
   async getAccountByPath (path) {
     const account = new WalletAccountTron(this.seed, path, {
-      rpcUrl: this.#tronWeb.fullNode.host
+      provider: this.#tronWeb.fullNode.host
     })
     this.#accounts.add(account)
     return account

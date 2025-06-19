@@ -36,7 +36,7 @@ import { derivePrivateKeyBuffer } from './signer/utils.js'
 
 /**
  * @typedef {Object} TronWalletConfig
- * @property {string} [rpcUrl] - The rpc url of the provider.
+ * @property {string} [provider] - The rpc url of the provider.
  */
 
 const BIP_44_TRON_DERIVATION_PATH_PREFIX = "m/44'/195'"
@@ -61,10 +61,10 @@ export default class WalletAccountTron extends IWalletAccount {
   constructor (seed, path, config = {}) {
     super(seed)
     this._config = config
-    const { rpcUrl } = this._config
+    const { provider } = this._config
 
     this._tronWeb = new TronWeb({
-      fullHost: rpcUrl || 'https://api.trongrid.io'
+      fullHost: provider || 'https://api.trongrid.io'
     })
 
     const fullPath = `${BIP_44_TRON_DERIVATION_PATH_PREFIX}/${path}`
