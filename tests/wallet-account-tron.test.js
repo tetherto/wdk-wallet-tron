@@ -7,9 +7,9 @@ const VALID_SEED = bip39.mnemonicToSeedSync(SEED_PHRASE)
 const VALID_PATH = "0'/0'"
 // Tron network configuration
 const VALID_CONFIG = {
-  // rpcUrl: "https://api.trongrid.io", // Mainnet
-  // rpcUrl: 'https://api.shasta.trongrid.io' // Testnet
-  rpcUrl: 'https://nile.trongrid.io' // Nile testnet
+  // provider: "https://api.trongrid.io", // Mainnet
+  // provider: 'https://api.shasta.trongrid.io' // Testnet
+  provider: 'https://nile.trongrid.io' // Nile testnet
 }
 const VALID_ADDRESS = 'TWcBKmZpttULdr9qN4ktr6YZG7YUSZizjh' // Example Tron address
 const USDT_CONTRACT_ADDRESSES = {
@@ -18,7 +18,7 @@ const USDT_CONTRACT_ADDRESSES = {
   'https://nile.trongrid.io': 'TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf' // USDT on Nile
 }
 
-const VALID_TOKEN = USDT_CONTRACT_ADDRESSES[VALID_CONFIG.rpcUrl]
+const VALID_TOKEN = USDT_CONTRACT_ADDRESSES[VALID_CONFIG.provider]
 
 describe('WalletAccountTron', () => {
   let wallet
@@ -215,7 +215,7 @@ describe('WalletAccountTron', () => {
         VALID_SEED,
         VALID_PATH,
         {
-          rpcUrl: 'https://invalid-rpc-url.com'
+          provider: 'https://invalid-rpc-url.com'
         }
       )
       const transferOptions = {
