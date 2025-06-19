@@ -7,6 +7,8 @@ export default class WalletManagerTron {
      * @param {TronWalletConfig} [config] - The configuration object.
      */
     constructor(seed: string | Uint8Array, config?: TronWalletConfig);
+    _tronWeb: any;
+    _accounts: Set<any>;
     /**
      * Returns the wallet account at a specific index (see [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki)).
      *
@@ -41,7 +43,6 @@ export default class WalletManagerTron {
      */
     dispose(): void;
     seed: any;
-    #private;
 }
 export type TronWalletConfig = import("./wallet-account-tron.js").TronWalletConfig;
 import WalletAccountTron from './wallet-account-tron.js';
