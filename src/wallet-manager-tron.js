@@ -25,8 +25,8 @@ const FEE_RATE_FAST_MULTIPLIER = 2.0
 /** @typedef {import('./wallet-account-tron.js').TronWalletConfig} TronWalletConfig */
 
 export default class WalletManagerTron extends AbstractWalletManager {
-  #tronWeb
-  #accounts
+  _tronWeb
+  _accounts
 
   /**
    * Creates a new wallet manager for tron blockchains.
@@ -36,11 +36,11 @@ export default class WalletManagerTron extends AbstractWalletManager {
    */
   constructor (seed, config = {}) {
     super(seed)
-    this.#accounts = new Set()
+    this._accounts = new Set()
 
     const { provider } = config
 
-    this.#tronWeb = new TronWeb({
+    this._tronWeb = new TronWeb({
       fullHost: provider || 'https://api.trongrid.io'
     })
   }
@@ -56,7 +56,7 @@ export default class WalletManagerTron extends AbstractWalletManager {
    */
   async getAccount (index = 0) {
     const account = await this.getAccountByPath(`0'/0/${index}`)
-    this.#accounts.add(account)
+    this._accounts.add(account)
     return account
   }
 
@@ -71,9 +71,9 @@ export default class WalletManagerTron extends AbstractWalletManager {
    */
   async getAccountByPath (path) {
     const account = new WalletAccountTron(this.seed, path, {
-      provider: this.#tronWeb.fullNode.host
+      provider: this._tronWeb.fullNode.host
     })
-    this.#accounts.add(account)
+    this._accounts.add(account)
     return account
   }
 
@@ -83,13 +83,13 @@ export default class WalletManagerTron extends AbstractWalletManager {
    * @returns {Promise<{ normal: number, fast: number }>} The fee rates (in sun).
    */
   async getFeeRates () {
-    if (!this.#tronWeb.fullNode.host) {
+    if (!this._tronWeb.fullNode.host) {
       throw new Error(
         'The wallet must be connected to a provider to get fee rates'
       )
     }
 
-    const chainParameters = await this.#tronWeb.trx.getChainParameters()
+    const chainParameters = await this._tronWeb.trx.getChainParameters()
 
     // Get fee parameters
     const getTransactionFee = chainParameters.find(
@@ -113,11 +113,11 @@ export default class WalletManagerTron extends AbstractWalletManager {
    * Disposes all the wallet accounts, and erases their private keys from the memory.
    */
   dispose () {
-    for (const account of this.#accounts) account.dispose()
-    this.#accounts.clear()
+    for (const account of this._accounts) account.dispose()
+    this._accounts.clear()
 
     sodium.sodium_memzero(this.seed)
     this.seed = null
-    this.#tronWeb = null
+    this._tronWeb = null
   }
 }
