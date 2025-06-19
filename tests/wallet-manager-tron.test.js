@@ -8,7 +8,7 @@ describe('WalletManagerTron', () => {
   const testConfig = {
     // rpcUrl: "https://api.trongrid.io", // Mainnet
     // rpcUrl: 'https://api.shasta.trongrid.io' // Testnet
-    rpcUrl: 'https://nile.trongrid.io' // Nile testnet
+    provider: 'https://nile.trongrid.io' // Nile testnet
   }
 
   beforeEach(async () => {
@@ -72,7 +72,7 @@ describe('WalletManagerTron', () => {
       const walletManagerWithInvalidRpc = new WalletManagerTron(
         testSeedPhrase,
         {
-          rpcUrl: 'https://invalid-rpc-url.com'
+          provider: 'https://invalid-rpc-url.com'
         }
       )
       await expect(walletManagerWithInvalidRpc.getFeeRates()).rejects.toThrow()
