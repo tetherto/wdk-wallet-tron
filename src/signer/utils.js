@@ -19,12 +19,9 @@ import { sha512 } from '@noble/hashes/sha2'
 import * as secp256k1 from '@noble/secp256k1'
 
 /** Constants for BIP32 key derivation */
-const CONSTANTS = {
-  MASTER_SECRET: new TextEncoder().encode('Bitcoin seed'),
-  HARDENED_OFFSET: 0x80000000,
-  PRIVATE_KEY_SIZE: 32,
-  DERIVATION_DATA_SIZE: 37 // 1 byte prefix + 32 bytes key + 4 bytes index
-}
+const MASTER_SECRET = new TextEncoder().encode('Bitcoin seed')
+const HARDENED_OFFSET = 0x80000000
+const PRIVATE_KEY_SIZE = 32
 
 /**
  * Encodes a 32-bit unsigned integer into a big-endian byte array
@@ -61,7 +58,7 @@ function parsePath (path) {
         throw new Error('Invalid index in derivation path')
       }
       if (component.endsWith("'")) {
-        index += CONSTANTS.HARDENED_OFFSET
+        index += HARDENED_OFFSET
       }
       return index
     })
@@ -74,7 +71,7 @@ function parsePath (path) {
  * @returns {number} -1 if less, 0 if equal, 1 if greater
  */
 function compareWithCurveOrder (buffer, startIndex = 0) {
-  for (let i = 0; i < CONSTANTS.PRIVATE_KEY_SIZE; i++) {
+  for (let i = 0; i < PRIVATE_KEY_SIZE; i++) {
     const curveOrderByte = Number((secp256k1.CURVE.n >> BigInt(8 * (31 - i))) & 0xffn)
     if (buffer[startIndex + i] > curveOrderByte) return 1
     if (buffer[startIndex + i] < curveOrderByte) return -1
@@ -132,7 +129,7 @@ function subtractFromPrivateKey (privateKey) {
  */
 export function derivePrivateKeyBuffer (seed, privateKeyBuffer, hmacOutputBuffer, derivationDataBuffer, path) {
   // Generate master key material
-  hmacOutputBuffer.set(hmac(sha512, CONSTANTS.MASTER_SECRET, seed))
+  hmacOutputBuffer.set(hmac(sha512, MASTER_SECRET, seed))
 
   // Set initial private key and chain code
   privateKeyBuffer.set(hmacOutputBuffer.subarray(0, 32))
@@ -146,7 +143,7 @@ export function derivePrivateKeyBuffer (seed, privateKeyBuffer, hmacOutputBuffer
     derivationDataBuffer.fill(0)
 
     // Prepare derivation data
-    if (index >= CONSTANTS.HARDENED_OFFSET) {
+    if (index >= HARDENED_OFFSET) {
       derivationDataBuffer[0] = 0x00
       derivationDataBuffer.set(privateKeyBuffer, 1)
     } else {

@@ -7,8 +7,24 @@ export default class WalletManagerTron {
      * @param {TronWalletConfig} [config] - The configuration object.
      */
     constructor(seed: string | Uint8Array, config?: TronWalletConfig);
-    _tronWeb: any;
-    _accounts: Set<any>;
+    /**
+     * A map between derivation paths and wallet accounts. It contains all the wallet accounts that have been accessed through the {@link getAccount} and {@link getAccountByPath} methods.
+     *
+     * @protected
+     * @type {{ [path: string]: WalletAccountTron }}
+     */
+    protected _accounts: {
+        [path: string]: WalletAccountTron;
+    };
+    /**
+     * The tron wallet configuration.
+     *
+     * @protected
+     * @type {TronWalletConfig}
+     */
+    protected _config: TronWalletConfig;
+    /** @private */
+    private _tronWeb;
     /**
      * Returns the wallet account at a specific index (see [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki)).
      *
@@ -42,7 +58,6 @@ export default class WalletManagerTron {
      * Disposes all the wallet accounts, and erases their private keys from the memory.
      */
     dispose(): void;
-    seed: any;
 }
 export type TronWalletConfig = import("./wallet-account-tron.js").TronWalletConfig;
 import WalletAccountTron from './wallet-account-tron.js';

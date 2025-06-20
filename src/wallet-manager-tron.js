@@ -15,7 +15,6 @@
 'use strict'
 
 import TronWeb from 'tronweb'
-import sodium from 'sodium-universal'
 import AbstractWalletManager from '@wdk/wallet'
 import WalletAccountTron from './wallet-account-tron.js'
 
@@ -25,9 +24,6 @@ const FEE_RATE_FAST_MULTIPLIER = 2.0
 /** @typedef {import('./wallet-account-tron.js').TronWalletConfig} TronWalletConfig */
 
 export default class WalletManagerTron extends AbstractWalletManager {
-  _tronWeb
-  _accounts
-
   /**
    * Creates a new wallet manager for tron blockchains.
    *
@@ -35,13 +31,26 @@ export default class WalletManagerTron extends AbstractWalletManager {
    * @param {TronWalletConfig} [config] - The configuration object.
    */
   constructor (seed, config = {}) {
-    super(seed)
-    this._accounts = new Set()
+    super(seed, config)
+    /**
+     * A map between derivation paths and wallet accounts. It contains all the wallet accounts that have been accessed through the {@link getAccount} and {@link getAccountByPath} methods.
+     *
+     * @protected
+     * @type {{ [path: string]: WalletAccountTron }}
+     */
+    this._accounts = {}
 
-    const { provider } = config
+    /**
+     * The tron wallet configuration.
+     *
+     * @protected
+     * @type {TronWalletConfig}
+     */
+    this._config = config
 
+    /** @private */
     this._tronWeb = new TronWeb({
-      fullHost: provider || 'https://api.trongrid.io'
+      fullHost: config.provider || 'https://api.trongrid.io'
     })
   }
 
@@ -55,9 +64,7 @@ export default class WalletManagerTron extends AbstractWalletManager {
    * @returns {Promise<WalletAccountTron>} The account.
    */
   async getAccount (index = 0) {
-    const account = await this.getAccountByPath(`0'/0/${index}`)
-    this._accounts.add(account)
-    return account
+    return await this.getAccountByPath(`0'/0/${index}`)
   }
 
   /**
@@ -70,9 +77,7 @@ export default class WalletManagerTron extends AbstractWalletManager {
    * @returns {Promise<WalletAccountTron>} The account.
    */
   async getAccountByPath (path) {
-    const account = new WalletAccountTron(this.seed, path, {
-      provider: this._tronWeb.fullNode.host
-    })
+    const account = new WalletAccountTron(this.seed, path, this._config)
     this._accounts.add(account)
     return account
   }
@@ -90,16 +95,8 @@ export default class WalletManagerTron extends AbstractWalletManager {
     }
 
     const chainParameters = await this._tronWeb.trx.getChainParameters()
-
-    // Get fee parameters
-    const getTransactionFee = chainParameters.find(
-      (param) => param.key === 'getTransactionFee'
-    )
-
-    // Base transaction fee
+    const getTransactionFee = chainParameters.find((param) => param.key === 'getTransactionFee')
     const baseFee = Number(getTransactionFee.value)
-
-    // Calculate fee rates using multipliers
     const normal = Math.round(baseFee * FEE_RATE_NORMAL_MULTIPLIER)
     const fast = Math.round(baseFee * FEE_RATE_FAST_MULTIPLIER)
 
@@ -113,11 +110,10 @@ export default class WalletManagerTron extends AbstractWalletManager {
    * Disposes all the wallet accounts, and erases their private keys from the memory.
    */
   dispose () {
-    for (const account of this._accounts) account.dispose()
-    this._accounts.clear()
+    for (const account of Object.values(this._accounts)) {
+      account.dispose()
+    }
 
-    sodium.sodium_memzero(this.seed)
-    this.seed = null
-    this._tronWeb = null
+    this._accounts = {}
   }
 }

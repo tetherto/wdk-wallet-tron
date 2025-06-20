@@ -17,7 +17,7 @@
     "@noble/secp256k1": "2.2.3",
     "@wdk/wallet": "https://github.com/tetherto/wdk-wallet.git#develop",
     "sodium-universal": "5.0.1",
-    "tronweb": "^5.3.4"
+    "tronweb": "5.3.4"
   },
   "devDependencies": {
     "bip39": "3.1.0",

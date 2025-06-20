@@ -18,8 +18,6 @@ import { secp256k1 } from '@noble/curves/secp256k1'
 import { SigningKey } from 'ethers'
 
 export class CustomSigningKey extends SigningKey {
-  #privateKeyBuffer
-
   constructor (privateKeyBuffer) {
     if (!(privateKeyBuffer instanceof Uint8Array)) {
       throw new Error('privateKeyBuffer must be a Uint8Array')
@@ -32,15 +30,15 @@ export class CustomSigningKey extends SigningKey {
     // we can pass a dummy one as we override all the signing methods
     super('0x0000000000000000000000000000000000000000000000000000000000000000')
 
-    this.#privateKeyBuffer = privateKeyBuffer
+    this._privateKeyBuffer = privateKeyBuffer
   }
 
   get compressedPublicKey () {
-    return secp256k1.getPublicKey(this.#privateKeyBuffer, true)
+    return secp256k1.getPublicKey(this._privateKeyBuffer, true)
   }
 
   get publicKey () {
-    return secp256k1.getPublicKey(this.#privateKeyBuffer, false)
+    return secp256k1.getPublicKey(this._privateKeyBuffer, false)
   }
 
   /**
@@ -48,7 +46,7 @@ export class CustomSigningKey extends SigningKey {
    * @param {string} digest - hex string of the message hash to sign
    */
   sign (message) {
-    const signature = secp256k1.sign(message, this.#privateKeyBuffer)
+    const signature = secp256k1.sign(message, this._privateKeyBuffer)
     return '0x' + signature.r.toString(16).padStart(64, '0') + signature.s.toString(16).padStart(64, '0') + (signature.recovery ? '1c' : '1b')
   }
 }
