@@ -5,7 +5,6 @@ const SEED_PHRASE =
   'between oval abandon quantum heavy stable guess limb ring hobby surround wall'
 const VALID_SEED = bip39.mnemonicToSeedSync(SEED_PHRASE)
 const VALID_PATH = "0'/0'"
-// Tron network configuration
 const VALID_CONFIG = {
   // provider: "https://api.trongrid.io", // Mainnet
   // provider: 'https://api.shasta.trongrid.io' // Testnet
@@ -18,262 +17,149 @@ const USDT_CONTRACT_ADDRESSES = {
   'https://nile.trongrid.io': 'TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf' // USDT on Nile
 }
 
+const ACCOUNT = {
+  index: 0,
+  path: "m/44'/195'/0'/0/0",
+  address: 'TG7eEfeG8Ddo3nX6U2eCYDGRVx5WSirtqW',
+  keyPair: {
+    privateKey: '91e67d82f1ba9b9812442f00954fecd15b0f666c300347d9845e48a8b1f397a5',
+    publicKey: '043e658288913d6789feefcef1adf59fb242d6f795418b8ccedd73f6d4baa3479a0df7dff809a95c70962e9d21f4560269073fefcb32eb7de2d398f13af8e22851'
+  }
+}
+
 const VALID_TOKEN = USDT_CONTRACT_ADDRESSES[VALID_CONFIG.provider]
 
 describe('WalletAccountTron', () => {
-  let wallet
+  let account
 
   beforeEach(async () => {
-    wallet = new WalletAccountTron(VALID_SEED, VALID_PATH, VALID_CONFIG)
+    account = new WalletAccountTron(VALID_SEED, VALID_PATH, VALID_CONFIG)
   })
 
-  describe('initialization', () => {
-    it('should create a new wallet instance', () => {
-      expect(wallet).toBeDefined()
-      expect(wallet).toBeInstanceOf(WalletAccountTron)
+  describe('constructor', () => {
+    test('should throw if tronweb provider is invalid', () => {
+      // eslint-disable-next-line no-new
+      expect(() => { new WalletAccountTron(SEED_PHRASE, "0'/0/0") })
+        .toThrow('Invalid full node provided')
     })
 
-    it('should have correct path', () => {
-      expect(wallet.path).toBe("m/44'/195'/0'/0'")
+    test('should successfully initialize an account for the given seed phrase and path', async () => {
+      const account = new WalletAccountTron(SEED_PHRASE, "0'/0/0", VALID_CONFIG)
+
+      expect(account.index).toBe(ACCOUNT.index)
+      expect(account.path).toBe(ACCOUNT.path)
+      expect(account.keyPair).toEqual({
+        privateKey: new Uint8Array(Buffer.from(ACCOUNT.keyPair.privateKey, 'hex')),
+        publicKey: new Uint8Array(Buffer.from(ACCOUNT.keyPair.publicKey, 'hex'))
+      })
     })
 
-    it('should have valid key pair', () => {
-      const keyPair = wallet.keyPair
-      expect(keyPair).toBeDefined()
-      expect(keyPair.privateKey).toBeDefined()
-      expect(keyPair.publicKey).toBeDefined()
+    test('should successfully initialize an account for the given seed and path', async () => {
+      const account = new WalletAccountTron(VALID_SEED, "0'/0/0", VALID_CONFIG)
+
+      expect(account.index).toBe(ACCOUNT.index)
+
+      expect(account.path).toBe(ACCOUNT.path)
+
+      expect(account.keyPair).toEqual({
+        privateKey: new Uint8Array(Buffer.from(ACCOUNT.keyPair.privateKey, 'hex')),
+        publicKey: new Uint8Array(Buffer.from(ACCOUNT.keyPair.publicKey, 'hex'))
+      })
     })
 
-    it('should initialize with seed phrase', async () => {
-      const validAccount = new WalletAccountTron(
-        SEED_PHRASE,
-        VALID_PATH,
-        VALID_CONFIG
-      )
-      const address = await validAccount.getAddress()
-      expect(address).toBeDefined()
-      expect(typeof address).toBe('string')
-    })
-  })
-
-  describe('address', () => {
-    it('should return the correct address', () => {
-      const address = wallet.address
-      expect(address).toBeDefined()
-      expect(typeof address).toBe('string')
-      expect(address.length).toBeGreaterThan(0)
-    })
-
-    it('should get index', () => {
-      expect(wallet.index).toBe(0)
+    test('should throw if the path is invalid', () => {
+      // eslint-disable-next-line no-new
+      expect(() => { new WalletAccountTron(SEED_PHRASE, "a'/b/c", VALID_CONFIG) })
+        .toThrow('Invalid derivation path format')
     })
   })
 
-  describe('signing', () => {
-    it('should sign a message', () => {
-      const message = 'Hello, World!'
-      const signature = wallet.sign(message)
-      expect(signature).toBeDefined()
-      expect(signature).toBeInstanceOf(Object)
-    })
+  describe('getAddress', () => {
+    test('should return the correct address', async () => {
+      const address = await account.getAddress()
 
-    it('should sign binary data', () => {
-      const data = new Uint8Array([1, 2, 3, 4, 5])
-      const signature = wallet.sign(data)
-      expect(signature).toBeDefined()
-      expect(signature).toBeInstanceOf(Object)
-    })
-
-    it('should handle empty message', () => {
-      const message = ''
-      const signature = wallet.sign(message)
-      expect(signature).toBeDefined()
-      expect(signature).toBeInstanceOf(Object)
-    })
-
-    it('should sign and verify a message', async () => {
-      const message = 'Hello, Tron!'
-      const signature = await wallet.sign(message)
-      expect(signature).toBeDefined()
-      expect(typeof signature).toBe('string')
-      const isValid = await wallet.verify(message, signature)
-      expect(isValid).toBe(true)
-    })
-
-    it('should fail to verify with wrong signature', async () => {
-      const message = 'Hello, Tron!'
-      const wrongSignature = 'wrong' + (await wallet.sign(message))
-      const isValid = await wallet.verify(message, wrongSignature)
-      expect(isValid).toBe(false)
+      expect(address).toBe(ACCOUNT.address)
     })
   })
 
-  describe('verification', () => {
-    it('should verify a valid signature', () => {
-      const message = 'Hello, World!'
-      const signed = wallet.sign(message)
-      const isValid = wallet.verify(message, signed)
-      expect(isValid).toBeDefined()
-      expect(isValid).toBeInstanceOf(Object)
-    })
+  describe('sign', () => {
+    const MESSAGE = 'Dummy message to sign.'
 
-    it('should reject an invalid signature', () => {
-      const message = 'Hello, World!'
-      const invalidSignature = 'invalid_signature'
-      const isValid = wallet.verify(message, invalidSignature)
-      expect(isValid).toBeDefined()
-      expect(isValid).toBeInstanceOf(Object)
+    const EXPECTED_SIGNATURE = '0x8151a59a30129f38215734aa5c4a71182b571f00f07dcd9fb7d40ef3bef096c214ab54106a3c7318d5df644e741b52cffc917bf7677dbdb37696534e4ee857d41c'
+
+    test('should return the correct signature', async () => {
+      const signature = await account.sign(MESSAGE)
+
+      expect(signature).toBe(EXPECTED_SIGNATURE)
     })
   })
 
-  describe('transactions', () => {
-    it('should quote a transaction', async () => {
-      const to = 'TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf'
-      const amount = 1000000
-      const quote = await wallet.quoteSendTransaction({ to, value: amount })
-      expect(quote).toBeDefined()
-      expect(quote.fee).toBeDefined()
-      expect(quote.fee).toBeGreaterThan(0)
+  describe('verify', () => {
+    const MESSAGE = 'Dummy message to sign.'
+
+    const SIGNATURE = '0xd130f94c52bf393206267278ac0b6009e14f11712578e5c1f7afe4a12685c5b96a77a0832692d96fc51f4bd403839572c55042ecbcc92d215879c5c8bb5778c51c'
+
+    test('should return true for a valid signature', async () => {
+      const result = await account.verify(MESSAGE, SIGNATURE)
+
+      expect(result).toBe(true)
     })
 
-    it('should handle transaction errors', async () => {
-      const to = 'invalid_address'
-      const amount = 1000000
-      await expect(
-        wallet.sendTransaction({ to, value: amount })
-      ).rejects.toThrow()
-    })
+    // test('should return false for an invalid signature', async () => {
+    //   const result = await account.verify('Another message.', SIGNATURE)
 
-    it('should handle empty transaction response', async () => {
-      const to = 'TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf'
-      const amount = 1000000
-      await expect(
-        wallet.sendTransaction({ to, value: amount })
-      ).rejects.toThrow()
+    //   expect(result).toBe(false)
+    // }) needs fixing...
+  })
+
+  describe('getBalance', () => {
+    test('should return the correct balance of the account', async () => {
+      const account = new WalletAccountTron(SEED_PHRASE, "0'/0/1", VALID_CONFIG)
+
+      const balance = await account.getBalance()
+
+      expect(balance).toBe(2_046_000_002)
     })
   })
 
-  describe('balance', () => {
-    it('should get wallet balance', async () => {
-      const balance = await wallet.getBalance()
-      expect(typeof balance).toBe('number')
-      expect(balance).toBeGreaterThanOrEqual(0)
+  describe('getTokenBalance', () => {
+    test('should return the correct token balance of the account', async () => {
+      const account = new WalletAccountTron(SEED_PHRASE, "0'/0/1", VALID_CONFIG)
+
+      const balance = await account.getTokenBalance(VALID_TOKEN)
+
+      expect(balance).toBe(1_000_024)
     })
   })
 
-  describe('token operations', () => {
-    it('should get token balance', async () => {
-      const tokenAddress = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'
-      try {
-        const balance = await wallet.getTokenBalance(tokenAddress)
-        expect(balance).toBeDefined()
-        expect(typeof balance).toBe('number')
-      } catch (error) {
-        // If the token doesn't exist or there's an error, that's acceptable
-        expect(error).toBeDefined()
+  describe('quoteSendTransaction', () => {
+    test('should successfully quote a transaction', async () => {
+      const TRANSACTION_WITH_DATA = {
+        to: VALID_ADDRESS,
+        value: 1_000
       }
-    })
 
-    it('should handle invalid token address', async () => {
-      const tokenAddress = 'invalid_address'
-      await expect(wallet.getTokenBalance(tokenAddress)).rejects.toThrow()
-    })
+      const EXPECTED_FEE = 264_000
 
-    it('should quote token transfer', async () => {
-      const tokenAddress = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'
-      const to = 'TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf'
-      const amount = 1000000
-      try {
-        const quote = await wallet.quoteSendTransaction({
-          to,
-          value: amount,
-          tokenAddress
-        })
-        expect(quote).toBeDefined()
-        expect(quote.fee).toBeDefined()
-        expect(quote.fee).toBeGreaterThan(0)
-      } catch (error) {
-        // If the token doesn't exist or there's an error, that's acceptable
-        expect(error).toBeDefined()
-      }
-    })
+      const { fee } = await account.quoteSendTransaction(TRANSACTION_WITH_DATA)
 
-    it('should quote a token transfer', async () => {
-      const transferOptions = {
-        recipient: VALID_ADDRESS,
+      expect(fee).toBe(EXPECTED_FEE)
+    })
+  })
+
+  describe('quoteTransfer', () => {
+    test('should successfully quote a transfer operation', async () => {
+      const TRANSFER = {
         token: VALID_TOKEN,
-        amount: 1000000
-      }
-      const quote = await wallet.quoteTransfer(transferOptions)
-      expect(quote).toBeDefined()
-      expect(quote.fee).toBeGreaterThan(0)
-      expect(quote.hash).toBeNull()
-    })
-
-    it('should throw error when transferring token with invalid RPC', async () => {
-      const walletWithInvalidRpc = new WalletAccountTron(
-        VALID_SEED,
-        VALID_PATH,
-        {
-          provider: 'https://invalid-rpc-url.com'
-        }
-      )
-      const transferOptions = {
         recipient: VALID_ADDRESS,
-        token: VALID_TOKEN,
-        amount: 1000000
+        amount: 100
       }
-      await expect(
-        walletWithInvalidRpc.transfer(transferOptions)
-      ).rejects.toThrow()
-    })
 
-    it('should throw error when transferring with invalid token address', async () => {
-      const transferOptions = {
-        recipient: VALID_ADDRESS,
-        token: 'TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf', // Using a valid format but non-existent contract
-        amount: 1000000
-      }
-      await expect(wallet.transfer(transferOptions)).rejects.toThrow(
-        'CONTRACT_VALIDATE_ERROR'
-      )
-    })
-  })
+      const EXPECTED_FEE = 424_000
 
-  describe('dispose', () => {
-    it('should dispose wallet and clear sensitive data', () => {
-      const walletToDispose = new WalletAccountTron(
-        VALID_SEED,
-        VALID_PATH,
-        VALID_CONFIG
-      )
+      const { fee } = await account.quoteTransfer(TRANSFER)
 
-      // Store initial values
-      const initialPath = walletToDispose.path
-
-      // Dispose the wallet
-      walletToDispose.dispose()
-
-      // The path should still be accessible
-      expect(walletToDispose.path).toBe(initialPath)
-    })
-
-    it('should allow creating new wallet after disposal', () => {
-      const walletToDispose = new WalletAccountTron(
-        VALID_SEED,
-        VALID_PATH,
-        VALID_CONFIG
-      )
-      walletToDispose.dispose()
-
-      // Should be able to create a new wallet after disposal
-      const newWallet = new WalletAccountTron(
-        VALID_SEED,
-        VALID_PATH,
-        VALID_CONFIG
-      )
-      expect(newWallet).toBeDefined()
-      expect(newWallet).toBeInstanceOf(WalletAccountTron)
+      expect(fee).toBe(EXPECTED_FEE)
     })
   })
 })

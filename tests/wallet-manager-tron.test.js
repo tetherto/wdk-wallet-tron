@@ -1,9 +1,11 @@
 /* eslint-env jest */
+import { jest } from '@jest/globals'
 import WalletManagerTron from '../src/wallet-manager-tron.js'
+import WalletAccountTron from '../src/wallet-account-tron.js'
 
 describe('WalletManagerTron', () => {
   let walletManager
-  const testSeedPhrase =
+  const SEED_PHRASE =
     'between oval abandon quantum heavy stable guess limb ring hobby surround wall'
   const testConfig = {
     // rpcUrl: "https://api.trongrid.io", // Mainnet
@@ -12,109 +14,79 @@ describe('WalletManagerTron', () => {
   }
 
   beforeEach(async () => {
-    walletManager = new WalletManagerTron(testSeedPhrase, testConfig)
+    walletManager = new WalletManagerTron(SEED_PHRASE, testConfig)
   })
 
-  describe('initialization', () => {
-    it('should create a new wallet manager instance', () => {
-      expect(walletManager).toBeDefined()
-      expect(walletManager).toBeInstanceOf(WalletManagerTron)
+  describe('constructor', () => {
+    test('should throw an error if the provider is invalid', () => {
+      // eslint-disable-next-line no-new
+      expect(() => { new WalletManagerTron(SEED_PHRASE, "a'/b/c") })
+        .toThrow('Invalid full node provided')
     })
   })
 
-  describe('account management', () => {
-    it('should get account by index', async () => {
-      const account = await walletManager.getAccount(0)
-      expect(account).toBeDefined()
+  describe('getAccount', () => {
+    test('should return the account at index 0 by default', async () => {
+      const account = await walletManager.getAccount()
+
+      expect(account).toBeInstanceOf(WalletAccountTron)
+
       expect(account.path).toBe("m/44'/195'/0'/0/0")
     })
 
-    it('should get account by path', async () => {
-      const account = await walletManager.getAccountByPath("0'/0'")
-      expect(account).toBeDefined()
-      expect(account.path).toBe("m/44'/195'/0'/0'")
+    test('should return the account at the given index', async () => {
+      const account = await walletManager.getAccount(3)
+
+      expect(account).toBeInstanceOf(WalletAccountTron)
+
+      expect(account.path).toBe("m/44'/195'/0'/0/3")
     })
 
-    it('should track accounts in internal set', async () => {
-      const account1 = await walletManager.getAccount(0)
-      const account2 = await walletManager.getAccount(1)
-      const account3 = await walletManager.getAccountByPath("0'/0'")
-
-      // All accounts should be tracked
-      expect(account1).toBeDefined()
-      expect(account2).toBeDefined()
-      expect(account3).toBeDefined()
+    test('should throw if the index is a negative number', async () => {
+      await expect(walletManager.getAccount(-1))
+        .rejects.toThrow('Invalid derivation path format')
     })
   })
 
-  describe('seed phrase', () => {
-    it('should get the seed phrase from the wallet manager', () => {
-      expect(walletManager.seed).toBeDefined()
+  describe('getAccountByPath', () => {
+    test('should return the account with the given path', async () => {
+      const account = await walletManager.getAccountByPath("1'/2/3")
+
+      expect(account).toBeInstanceOf(WalletAccountTron)
+
+      expect(account.path).toBe("m/44'/195'/1'/2/3")
     })
 
-    it('should throw an error if the seed phrase is invalid', () => {
-      expect(
-        () => new WalletManagerTron('invalid seed phrase', testConfig)
-      ).toThrow()
+    test('should throw if the path is invalid', async () => {
+      await expect(walletManager.getAccountByPath("a'/b/c"))
+        .rejects.toThrow('Invalid derivation path format')
     })
   })
 
-  describe('fee rates', () => {
-    it('should get the fee rates', async () => {
+  describe('getFeeRates', () => {
+    test('should return the correct fee rates', async () => {
       const feeRates = await walletManager.getFeeRates()
-      expect(feeRates).toBeDefined()
-      expect(feeRates.normal).toBeGreaterThan(0)
-      expect(feeRates.fast).toBeGreaterThan(0)
-      expect(feeRates.fast).toBeGreaterThan(feeRates.normal)
-    })
 
-    it('should handle RPC errors gracefully', async () => {
-      const walletManagerWithInvalidRpc = new WalletManagerTron(
-        testSeedPhrase,
-        {
-          provider: 'https://invalid-rpc-url.com'
-        }
-      )
-      await expect(walletManagerWithInvalidRpc.getFeeRates()).rejects.toThrow()
+      expect(feeRates.normal).toBe(1_100)
+
+      expect(feeRates.fast).toBe(2_000)
     })
   })
 
   describe('dispose', () => {
     it('should dispose all accounts and clear sensitive data', async () => {
-      // Create some accounts
       const account1 = await walletManager.getAccount(0)
       const account2 = await walletManager.getAccount(1)
 
-      // Store initial values
-      const initialPath1 = account1.path
-      const initialPath2 = account2.path
+      const disposeSpy1 = jest.spyOn(account1, 'dispose')
+      const disposeSpy2 = jest.spyOn(account2, 'dispose')
 
-      // Get fee rates before disposal
-      const feeRates = await walletManager.getFeeRates()
-      expect(feeRates).toBeDefined()
-      expect(feeRates.normal).toBeGreaterThan(0)
-      expect(feeRates.fast).toBeGreaterThan(0)
-
-      // Make seed property writable for the test
-      const seedValue = walletManager.seed
-      Object.defineProperty(walletManager, 'seed', {
-        value: seedValue,
-        writable: true,
-        configurable: true
-      })
-
-      // Dispose the wallet manager
       walletManager.dispose()
 
-      // The paths should still be accessible
-      expect(account1.path).toBe(initialPath1)
-      expect(account2.path).toBe(initialPath2)
+      expect(disposeSpy1).toHaveBeenCalled()
+      expect(disposeSpy2).toHaveBeenCalled()
 
-      // Try to get fee rates - should throw error since TronWeb is disposed
-      await expect(walletManager.getFeeRates()).rejects.toThrow()
-
-      // Try to get a new account - should throw error since TronWeb is disposed
-      await expect(walletManager.getAccount(0)).rejects.toThrow()
+      expect(walletManager.seed.equals(Buffer.alloc(64))).toBe(true)
     })
   })
 })

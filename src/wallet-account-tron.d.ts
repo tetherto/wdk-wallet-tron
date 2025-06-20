@@ -117,11 +117,6 @@ export default class WalletAccountTron implements IWalletAccount {
     dispose(): void;
     _signTransaction(transaction: any): Promise<any>;
     /**
-     * Checks if the wallet is connected to a provider.
-     * @private
-     */
-    private _checkProviderConnection;
-    /**
      * Calculates transaction cost based on bandwidth consumption.
      * @private
      * @param {string} rawDataHex - The raw transaction data in hex format

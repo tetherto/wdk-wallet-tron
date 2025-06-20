@@ -20,6 +20,7 @@
     "tronweb": "5.3.4"
   },
   "devDependencies": {
+    "@jest/globals": "29.7.0",
     "bip39": "3.1.0",
     "cross-env": "7.0.3",
     "jest": "29.7.0",

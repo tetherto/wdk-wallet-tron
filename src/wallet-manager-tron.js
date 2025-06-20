@@ -15,6 +15,7 @@
 'use strict'
 
 import TronWeb from 'tronweb'
+import sodium from 'sodium-universal'
 import AbstractWalletManager from '@wdk/wallet'
 import WalletAccountTron from './wallet-account-tron.js'
 
@@ -50,7 +51,7 @@ export default class WalletManagerTron extends AbstractWalletManager {
 
     /** @private */
     this._tronWeb = new TronWeb({
-      fullHost: config.provider || 'https://api.trongrid.io'
+      fullHost: config.provider
     })
   }
 
@@ -77,9 +78,13 @@ export default class WalletManagerTron extends AbstractWalletManager {
    * @returns {Promise<WalletAccountTron>} The account.
    */
   async getAccountByPath (path) {
-    const account = new WalletAccountTron(this.seed, path, this._config)
-    this._accounts.add(account)
-    return account
+    if (!this._accounts[path]) {
+      const account = new WalletAccountTron(this.seed, path, this._config)
+
+      this._accounts[path] = account
+    }
+
+    return this._accounts[path]
   }
 
   /**
@@ -114,6 +119,8 @@ export default class WalletManagerTron extends AbstractWalletManager {
       account.dispose()
     }
 
+    sodium.sodium_memzero(this.seed)
+    this._tronWeb = null
     this._accounts = {}
   }
 }

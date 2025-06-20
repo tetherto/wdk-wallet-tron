@@ -21,6 +21,8 @@ import { keccak_256 as keccak256 } from '@noble/hashes/sha3'
 import { CustomSigningKey } from './signer/custom-signing-key.js'
 import { derivePrivateKeyBuffer } from './signer/utils.js'
 
+import * as bip39 from 'bip39'
+
 /** @typedef {import('@wdk/wallet').IWalletAccount} IWalletAccount */
 /** @typedef {import('@wdk/wallet').KeyPair} KeyPair */
 /** @typedef {import('@wdk/wallet').TransactionResult} TransactionResult */
@@ -65,7 +67,7 @@ export default class WalletAccountTron {
      * @type {TronWeb}
      */
     this._tronWeb = new TronWeb({
-      fullHost: this._config.provider || 'https://api.trongrid.io'
+      fullHost: this._config.provider
     })
 
     /** @private */
@@ -76,6 +78,14 @@ export default class WalletAccountTron {
     this._hmacOutputBuffer = new Uint8Array(64)
     /** @private */
     this._derivationDataBuffer = new Uint8Array(37)
+
+    if (typeof seed === 'string') {
+      if (!bip39.validateMnemonic(seed)) {
+        throw new Error('The seed phrase is invalid.')
+      }
+
+      seed = bip39.mnemonicToSeedSync(seed)
+    }
 
     derivePrivateKeyBuffer(
       seed,
@@ -179,8 +189,6 @@ export default class WalletAccountTron {
    * @returns {Promise<number>} The native token balance.
    */
   async getBalance () {
-    this._checkProviderConnection()
-
     const balance = await this._tronWeb.trx.getBalance(await this.getAddress())
     return Number(balance)
   }
@@ -194,8 +202,6 @@ export default class WalletAccountTron {
    * @throws {Error} If the contract interaction fails or returns invalid data.
    */
   async getTokenBalance (tokenAddress) {
-    this._checkProviderConnection()
-
     const contract = await this._tronWeb.contract().at(tokenAddress)
     if (!contract) {
       throw new Error(`Failed to load contract at address ${tokenAddress}`)
@@ -234,8 +240,6 @@ export default class WalletAccountTron {
    * @returns {Promise<TransactionResult>} The send transaction's result.
    */
   async sendTransaction ({ to, value }) {
-    this._checkProviderConnection()
-
     const from = await this.getAddress()
     const transaction = await this._tronWeb.transactionBuilder.sendTrx(
       to,
@@ -270,8 +274,6 @@ export default class WalletAccountTron {
    * @returns {Promise<Omit<TransactionResult, "hash">>} The transaction's quotes.
    */
   async quoteSendTransaction ({ to, value }) {
-    this._checkProviderConnection()
-
     const from = await this.getAddress()
 
     const transaction = await this._tronWeb.transactionBuilder.sendTrx(
@@ -290,8 +292,6 @@ export default class WalletAccountTron {
    * @returns {Promise<TransferResult>} The transfer's result.
    */
   async transfer (options) {
-    this._checkProviderConnection()
-
     const { recipient, token, amount } = options
     const from = await this.getAddress()
     const hexFrom = this._tronWeb.address.toHex(from)
@@ -339,8 +339,6 @@ export default class WalletAccountTron {
    * @returns {Promise<Omit<TransferResult, "hash">>} The transfer's quotes.
    */
   async quoteTransfer (options) {
-    this._checkProviderConnection()
-
     const { recipient, token, amount } = options
     const from = await this.getAddress()
     const parameter = [
@@ -399,18 +397,6 @@ export default class WalletAccountTron {
     const signature = await this._signingKey.sign(rawTx)
     transaction.signature = [signature]
     return transaction
-  }
-
-  /**
-   * Checks if the wallet is connected to a provider.
-   * @private
-   */
-  _checkProviderConnection () {
-    if (!this._tronWeb.fullNode.host) {
-      throw new Error(
-        'The wallet must be connected to a provider to perform this operation'
-      )
-    }
   }
 
   /**
