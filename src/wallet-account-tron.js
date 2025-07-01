@@ -23,6 +23,8 @@ import { derivePrivateKeyBuffer } from './signer/utils.js'
 
 import * as bip39 from 'bip39'
 
+/** @typedef {import('tronweb').Types.TransactionInfo} TronTransactionReceipt */
+
 /** @typedef {import('@wdk/wallet').IWalletAccount} IWalletAccount */
 /** @typedef {import('@wdk/wallet').KeyPair} KeyPair */
 /** @typedef {import('@wdk/wallet').TransactionResult} TransactionResult */
@@ -41,6 +43,7 @@ import * as bip39 from 'bip39'
  */
 
 const BIP_44_TRON_DERIVATION_PATH_PREFIX = "m/44'/195'"
+const BANDWIDTH_PRICE = 1000
 
 /** @implements {IWalletAccount} */
 export default class WalletAccountTron {
@@ -247,7 +250,7 @@ export default class WalletAccountTron {
       from
     )
 
-    const fee = await this._calculateTransactionCost(
+    const fee = await this._calculateBandwidthCost(
       transaction.raw_data_hex
     )
 
@@ -282,7 +285,8 @@ export default class WalletAccountTron {
       from
     )
 
-    const fee = await this._calculateTransactionCost(transaction.raw_data_hex)
+    const fee = await this._calculateBandwidthCost(transaction.raw_data_hex)
+
     return { fee }
   }
 
@@ -303,7 +307,7 @@ export default class WalletAccountTron {
       throw new Error('Exceeded maximum fee cost for transfer operations.')
     }
 
-    const parameter = [
+    const parameters = [
       { type: 'address', value: hexRecipient },
       { type: 'uint256', value: amount }
     ]
@@ -311,12 +315,12 @@ export default class WalletAccountTron {
       await this._tronWeb.transactionBuilder.triggerSmartContract(
         token,
         'transfer(address,uint256)',
-        { feeLimit: 1000000000, callValue: 0 },
-        parameter,
+        { feeLimit: this._config.transferMaxFee, callValue: 0 },
+        parameters,
         hexFrom
       )
-    const unsignedTx = txResult.transaction
 
+    const unsignedTx = txResult.transaction
     const signature = await this._signingKey.sign(unsignedTx.txID)
     unsignedTx.signature = [signature]
 
@@ -334,37 +338,75 @@ export default class WalletAccountTron {
   }
 
   /**
-   * Quotes the costs of a transfer operation.
+   * Quotes the costs of a token transfer operation.
    * @param {TransferOptions} options - The transfer's options.
    * @returns {Promise<Omit<TransferResult, "hash">>} The transfer's quotes.
    */
   async quoteTransfer (options) {
     const { recipient, token, amount } = options
     const from = await this.getAddress()
+    const functionSelector = 'transfer(address,uint256)'
     const parameter = [
-      { type: 'address', value: recipient },
+      { type: 'address', value: this._tronWeb.address.toHex(recipient) },
       { type: 'uint256', value: amount }
     ]
 
-    const transaction =
-      await this._tronWeb.transactionBuilder.triggerSmartContract(
-        token,
-        'transfer(address,uint256)',
-        { feeLimit: 1000000000, callValue: 0 },
-        parameter,
-        from
-      )
-
-    const fee = await this._calculateTransactionCost(
-      transaction.transaction.raw_data_hex
+    const simulationResult = await this._tronWeb.transactionBuilder.triggerConstantContract(
+      token,
+      functionSelector,
+      {},
+      parameter,
+      from
     )
+
+    // eslint-disable-next-line
+    const energy_required = simulationResult.energy_used
+
+    // eslint-disable-next-line
+    if (energy_required === undefined) {
+      throw new Error('Could not estimate energy. The transaction may fail.')
+    }
+
+    const chainParams = await this._tronWeb.trx.getChainParameters()
+    const energyPrice = chainParams.find(param => param.key === 'getEnergyFee').value
+    const resources = await this._tronWeb.trx.getAccountResources(from)
+    const availableEnergy = (resources.EnergyLimit || 0) - (resources.EnergyUsed || 0)
+
+    let energyCostInSun = 0
+
+    // eslint-disable-next-line
+    if (availableEnergy < energy_required) {
+      // eslint-disable-next-line
+      energyCostInSun = Math.ceil(energy_required * energyPrice)
+    }
+
+    // eslint-disable-next-line
+    const bandwidthCostInSun = await this._calculateBandwidthCost(simulationResult.transaction.raw_data_hex)
+
+    const fee = energyCostInSun + bandwidthCostInSun
 
     return { fee }
   }
 
   /**
-   * Disposes the wallet account, and erases the private key from the memory.
+   * Returns a transaction's receipt.
+   *
+   * @param {string} hash - The transaction's hash.
+   * @returns {Promise<TronTransactionReceipt | null>} The receipt, or null if the transaction has not been included in a block yet.
    */
+  async getTransactionReceipt (hash) {
+    const receipt = await this._tronWeb.trx.getTransactionInfo(hash)
+
+    if (!receipt || Object.keys(receipt).length === 0) {
+      return null
+    }
+
+    return receipt
+  }
+
+  /**
+     * Disposes the wallet account, and erases the private key from the memory.
+     */
   dispose () {
     sodium.sodium_memzero(this._privateKeyBuffer)
     sodium.sodium_memzero(this._hmacOutputBuffer)
@@ -401,17 +443,24 @@ export default class WalletAccountTron {
 
   /**
    * Calculates transaction cost based on bandwidth consumption.
-   * @private
+   * @protected
    * @param {string} rawDataHex - The raw transaction data in hex format
    * @returns {Promise<number>} The transaction cost in sun (1 TRX = 1,000,000 sun)
    */
-  async _calculateTransactionCost (rawDataHex) {
+  async _calculateBandwidthCost (rawDataHex) {
     const from = await this.getAddress()
     const resources = await this._tronWeb.trx.getAccountResources(from)
     const txSizeBytes = rawDataHex.length / 2
-    const freeBandwidth = Number(resources.freeNetRemaining) || 0
-    const bandwidthConsumption = txSizeBytes * 2
-    const missingBandwidth = Math.max(bandwidthConsumption - freeBandwidth, 0)
-    return missingBandwidth * 1_000 // 1 TRX per 1000 bandwidth units
+    const requiredBandwidth = txSizeBytes * 2
+    const freeBandwidthLeft = (resources.freeNetLimit || 0) - (resources.freeNetUsed || 0)
+    const frozenBandwidthLeft = (resources.NetLimit || 0) - (resources.NetUsed || 0)
+    const totalAvailableBandwidth = freeBandwidthLeft + frozenBandwidthLeft
+    const missingBandwidth = Math.max(0, requiredBandwidth - totalAvailableBandwidth)
+
+    if (missingBandwidth === 0) {
+      return 0
+    }
+
+    return Math.ceil(requiredBandwidth * BANDWIDTH_PRICE)
   }
 }

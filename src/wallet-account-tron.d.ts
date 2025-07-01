@@ -106,25 +106,33 @@ export default class WalletAccountTron implements IWalletAccount {
      */
     transfer(options: TransferOptions): Promise<TransferResult>;
     /**
-     * Quotes the costs of a transfer operation.
+     * Quotes the costs of a token transfer operation.
      * @param {TransferOptions} options - The transfer's options.
      * @returns {Promise<Omit<TransferResult, "hash">>} The transfer's quotes.
      */
     quoteTransfer(options: TransferOptions): Promise<Omit<TransferResult, "hash">>;
     /**
-     * Disposes the wallet account, and erases the private key from the memory.
+     * Returns a transaction's receipt.
+     *
+     * @param {string} hash - The transaction's hash.
+     * @returns {Promise<TronTransactionReceipt | null>} The receipt, or null if the transaction has not been included in a block yet.
      */
+    getTransactionReceipt(hash: string): Promise<TronTransactionReceipt | null>;
+    /**
+       * Disposes the wallet account, and erases the private key from the memory.
+       */
     dispose(): void;
     _signTransaction(transaction: any): Promise<any>;
     /**
      * Calculates transaction cost based on bandwidth consumption.
-     * @private
+     * @protected
      * @param {string} rawDataHex - The raw transaction data in hex format
      * @returns {Promise<number>} The transaction cost in sun (1 TRX = 1,000,000 sun)
      */
-    private _calculateTransactionCost;
+    protected _calculateBandwidthCost(rawDataHex: string): Promise<number>;
 }
-export type IWalletAccount = any;
+export type TronTransactionReceipt = import('tronweb').Types.TransactionInfo;
+export type IWalletAccount = import("@wdk/wallet").IWalletAccount;
 export type KeyPair = import("@wdk/wallet").KeyPair;
 export type TransactionResult = import("@wdk/wallet").TransactionResult;
 export type TransferOptions = import("@wdk/wallet").TransferOptions;
