@@ -15,17 +15,17 @@
 'use strict'
 
 import TronWeb from 'tronweb'
-import { getBytesCopy } from 'ethers'
-import sodium from 'sodium-universal'
-import { keccak_256 as keccak256 } from '@noble/hashes/sha3'
-import { CustomSigningKey } from './signer/custom-signing-key.js'
-import { derivePrivateKeyBuffer } from './signer/utils.js'
+
+import { keccak_256 } from '@noble/hashes/sha3'
 
 import * as bip39 from 'bip39'
+
+import MemorySafeHDNodeWallet from './memory-safe/hd-node-wallet.js'
 
 /** @typedef {import('tronweb').Types.TransactionInfo} TronTransactionReceipt */
 
 /** @typedef {import('@wdk/wallet').IWalletAccount} IWalletAccount */
+
 /** @typedef {import('@wdk/wallet').KeyPair} KeyPair */
 /** @typedef {import('@wdk/wallet').TransactionResult} TransactionResult */
 /** @typedef {import('@wdk/wallet').TransferOptions} TransferOptions */
@@ -34,54 +34,30 @@ import * as bip39 from 'bip39'
 /**
  * @typedef {Object} TronTransaction
  * @property {string} to - The transaction's recipient.
- * @property {number} value - The amount of sun to send to the recipient (1 TRX = 1,000,000 sun).
+ * @property {number} value - The amount of tronixs to send to the recipient (in suns).
  */
 
 /**
  * @typedef {Object} TronWalletConfig
- * @property {string} [provider] - The rpc url of the provider.
+ * @property {string | TronWeb} [provider] - The url of the tron web provider, or an instance of the {@link TronWeb} class.
  */
 
 const BIP_44_TRON_DERIVATION_PATH_PREFIX = "m/44'/195'"
-const BANDWIDTH_PRICE = 1000
+
+const TRON_MESSAGE_PREFIX = '\x19Tron Signed Message:\n'
+
+const BANDWIDTH_PRICE = 1_000
 
 /** @implements {IWalletAccount} */
 export default class WalletAccountTron {
   /**
    * Creates a new tron wallet account.
    *
-   * @param {string | Uint8Array} seed - The bip-39 mnemonic.
+   * @param {string | Uint8Array} seed - The wallet's [BIP-39](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki) seed phrase.
    * @param {string} path - The BIP-44 derivation path (e.g. "0'/0/0").
    * @param {TronWalletConfig} [config] - The configuration object.
    */
   constructor (seed, path, config = {}) {
-    /**
-     * The tron wallet configuration.
-     *
-     * @protected
-     * @type {TronWalletConfig}
-     */
-    this._config = config
-
-    /**
-     * The tron web client.
-     *
-     * @protected
-     * @type {TronWeb}
-     */
-    this._tronWeb = new TronWeb({
-      fullHost: this._config.provider
-    })
-
-    /** @private */
-    this._path = `${BIP_44_TRON_DERIVATION_PATH_PREFIX}/${path}`
-    /** @private */
-    this._privateKeyBuffer = new Uint8Array(32)
-    /** @private */
-    this._hmacOutputBuffer = new Uint8Array(64)
-    /** @private */
-    this._derivationDataBuffer = new Uint8Array(37)
-
     if (typeof seed === 'string') {
       if (!bip39.validateMnemonic(seed)) {
         throw new Error('The seed phrase is invalid.')
@@ -90,16 +66,38 @@ export default class WalletAccountTron {
       seed = bip39.mnemonicToSeedSync(seed)
     }
 
-    derivePrivateKeyBuffer(
-      seed,
-      this._privateKeyBuffer,
-      this._hmacOutputBuffer,
-      this._derivationDataBuffer,
-      this._path
-    )
+    path = BIP_44_TRON_DERIVATION_PATH_PREFIX + '/' + path
 
-    /** @private */
-    this._signingKey = new CustomSigningKey(this._privateKeyBuffer)
+    /**
+     * The tron wallet account configuration.
+     *
+     * @protected
+     * @type {TronWalletConfig}
+     */
+    this._config = config
+
+    /**
+     * The account.
+     *
+     * @protected
+     * @type {HDNodeWallet}
+     */
+    this._account = MemorySafeHDNodeWallet.fromSeed(seed)
+      .derivePath(path)
+
+    const { provider } = config
+
+    if (provider) {
+      /**
+       * The tron web client.
+       *
+       * @protected
+       * @type {TronWeb | undefined}
+       */
+      this._tronWeb = typeof provider === 'string'
+        ? new TronWeb({ fullHost: provider })
+        : provider
+    }
   }
 
   /**
@@ -108,7 +106,7 @@ export default class WalletAccountTron {
    * @type {number}
    */
   get index () {
-    return parseInt(this._path.split('/').pop())
+    return this._account.index
   }
 
   /**
@@ -117,7 +115,7 @@ export default class WalletAccountTron {
    * @type {string}
    */
   get path () {
-    return this._path
+    return this._account.path
   }
 
   /**
@@ -127,8 +125,8 @@ export default class WalletAccountTron {
    */
   get keyPair () {
     return {
-      privateKey: this._privateKeyBuffer,
-      publicKey: getBytesCopy(this._signingKey.publicKey)
+      privateKey: this._account.privateKeyBuffer,
+      publicKey: this._account.publicKeyBuffer
     }
   }
 
@@ -138,12 +136,15 @@ export default class WalletAccountTron {
    * @returns {Promise<string>} The account's address.
    */
   async getAddress () {
-    const pubKey = this._signingKey.publicKey
-    const pubKeyNoPrefix = pubKey.slice(1)
-    const hash = keccak256(pubKeyNoPrefix)
-    const tronAddress = hash.slice(12)
-    const tronAddressHex = '41' + Buffer.from(tronAddress).toString('hex')
-    return this._tronWeb.address.fromHex(tronAddressHex)
+    const publicKey = this._account.signingKey.publicKey.slice(1)
+    const publicKeyHash = keccak_256(publicKey)
+    const addressBytes = publicKeyHash.slice(12)
+
+    const addressHex = '41' + Buffer.from(addressBytes).toString('hex')
+
+    const address = this._tronWeb.address.fromHex(addressHex)
+
+    return address
   }
 
   /**
@@ -153,21 +154,11 @@ export default class WalletAccountTron {
    * @returns {Promise<string>} The message's signature.
    */
   async sign (message) {
-    const messageBytes =
-      typeof message === 'string' ? new TextEncoder().encode(message) : message
+    const messageWithPrefix = Buffer.from(TRON_MESSAGE_PREFIX + message.length + message, 'utf8')
+    const hash = keccak_256(messageWithPrefix)
+    const { serialized } = this._account.signingKey.sign(hash)
 
-    const prefix = new TextEncoder().encode(
-      '\x19TRON Signed Message:\n' + messageBytes.length
-    )
-    const prefixedMessage = new Uint8Array(prefix.length + messageBytes.length)
-    prefixedMessage.set(prefix)
-    prefixedMessage.set(messageBytes, prefix.length)
-
-    const messageHash = keccak256(prefixedMessage)
-
-    const signature = this._signingKey.sign(messageHash)
-
-    return signature
+    return serialized
   }
 
   /**
@@ -178,212 +169,168 @@ export default class WalletAccountTron {
    * @returns {Promise<boolean>} True if the signature is valid.
    */
   async verify (message, signature) {
-    try {
-      await this._tronWeb.trx.verifyMessageV2(message, signature)
-      return true
-    } catch (_) {
-      return false
-    }
+    return await this.sign(message) === signature
   }
 
   /**
-   * Returns the account's native token balance.
+   * Returns the account's tronix balance.
    *
-   * @returns {Promise<number>} The native token balance.
+   * @returns {Promise<number>} The tronix balance (in suns).
    */
   async getBalance () {
-    const balance = await this._tronWeb.trx.getBalance(await this.getAddress())
+    if (!this._tronWeb) {
+      throw new Error('The wallet must be connected to tron web to retrieve balances.')
+    }
+
+    const address = await this.getAddress()
+
+    const balance = await this._tronWeb.trx.getBalance(address)
+
     return Number(balance)
   }
 
   /**
    * Returns the account balance for a specific token.
-   * Uses low-level contract interaction to ensure compatibility with all TRC20 tokens.
    *
    * @param {string} tokenAddress - The smart contract address of the token.
-   * @returns {Promise<number>} The token balance.
-   * @throws {Error} If the contract interaction fails or returns invalid data.
+   * @returns {Promise<number>} The token balance (in base unit).
    */
   async getTokenBalance (tokenAddress) {
-    const contract = await this._tronWeb.contract().at(tokenAddress)
-    if (!contract) {
-      throw new Error(`Failed to load contract at address ${tokenAddress}`)
+    if (!this._tronWeb) {
+      throw new Error('The wallet must be connected to tron web to retrieve token balances.')
     }
 
     const address = await this.getAddress()
-    const hexAddress = this._tronWeb.address.toHex(address)
+    const parameters = [{ type: 'address', value: addressHex }]
+    const issuerAddress = this._tronWeb.address.toHex(address)
 
-    const result =
-      await this._tronWeb.transactionBuilder.triggerConstantContract(
-        tokenAddress,
-        'balanceOf(address)',
-        {},
-        [
-          {
-            type: 'address',
-            value: hexAddress
-          }
-        ],
-        address
-      )
+    const result = await this._tronWeb.transactionBuilder
+      .triggerConstantContract(tokenAddress, 'balanceOf(address)', { }, parameters, issuerAddress)
 
-    if (!result || !result.constant_result || !result.constant_result[0]) {
-      throw new Error('Invalid response format from contract')
-    }
+    const balance = this._tronWeb.toBigNumber('0x' + result.constant_result[0])
 
-    const balance = this._tronWeb.toBigNumber(
-      '0x' + result.constant_result[0]
-    )
-    return Number(balance.toString())
+    return Number(balance)
   }
 
   /**
    * Sends a transaction.
+   * 
    * @param {TronTransaction} tx - The transaction.
-   * @returns {Promise<TransactionResult>} The send transaction's result.
+   * @returns {Promise<TransactionResult>} The transaction's result.
    */
   async sendTransaction ({ to, value }) {
-    const from = await this.getAddress()
-    const transaction = await this._tronWeb.transactionBuilder.sendTrx(
-      to,
-      value,
-      from
-    )
-
-    const fee = await this._calculateBandwidthCost(
-      transaction.raw_data_hex
-    )
-
-    const signedTransaction = await this._signTransaction(transaction)
-    const sendResponse = await this._tronWeb.trx.sendRawTransaction(
-      signedTransaction
-    )
-
-    if (!sendResponse || !sendResponse.result) {
-      throw new Error(
-        sendResponse
-          ? sendResponse.code || JSON.stringify(sendResponse)
-          : 'Empty response from network'
-      )
+    if (!this._tronWeb) {
+      throw new Error('The wallet must be connected to tron web to send transactions.')
     }
 
-    return { hash: sendResponse.txid, fee }
+    const address = await this.getAddress()
+
+    const transaction = await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
+    const fee = await this._getBandwidthCost(transaction.raw_data_hex)
+    const signedTransaction = await this._signTransaction(transaction)
+
+    const { txid } = await this._tronWeb.trx.sendRawTransaction(signedTransaction)
+
+    return { hash: txid, fee }
   }
 
   /**
-   * Quotes a transaction.
+   * Quotes the costs of a send transaction operation.
    *
-   * @param {TronTransaction} tx - The transaction to quote.
-   * @returns {Promise<Omit<TransactionResult, "hash">>} The transaction's quotes.
+   * @see {@link sendTransaction}
+   * @param {TronTransaction} tx - The transaction.
+   * @returns {Promise<Omit<TransactionResult, 'hash'>>} The transaction's quotes.
    */
   async quoteSendTransaction ({ to, value }) {
-    const from = await this.getAddress()
+    if (!this._tronWeb) {
+      throw new Error('The wallet must be connected to tron web to quote transactions.')
+    }
 
-    const transaction = await this._tronWeb.transactionBuilder.sendTrx(
-      to,
-      value,
-      from
-    )
+    const address = await this.getAddress()
 
-    const fee = await this._calculateBandwidthCost(transaction.raw_data_hex)
+    const transaction = await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
+    const fee = await this._getBandwidthCost(transaction.raw_data_hex)
 
     return { fee }
   }
 
   /**
    * Transfers a token to another address.
+   * 
    * @param {TransferOptions} options - The transfer's options.
    * @returns {Promise<TransferResult>} The transfer's result.
    */
-  async transfer (options) {
-    const { recipient, token, amount } = options
-    const from = await this.getAddress()
-    const hexFrom = this._tronWeb.address.toHex(from)
-    const hexRecipient = this._tronWeb.address.toHex(recipient)
-    const { fee } = await this.quoteTransfer(options)
+  async transfer ({ token, recipient, amount }) {
+    if (!this._tronWeb) {
+      throw new Error('The wallet must be connected to tron web to transfer tokens.')
+    }
+    
+    const { fee } = await this.quoteTransfer({ token, recipient, amount })
 
-    // eslint-disable-next-line
+    // eslint-disable-next-line eqeqeq
     if (this._config.transferMaxFee != undefined && fee >= this._config.transferMaxFee) {
       throw new Error('Exceeded maximum fee cost for transfer operations.')
     }
 
-    const parameters = [
-      { type: 'address', value: hexRecipient },
-      { type: 'uint256', value: amount }
-    ]
-    const txResult =
-      await this._tronWeb.transactionBuilder.triggerSmartContract(
-        token,
-        'transfer(address,uint256)',
-        { feeLimit: this._config.transferMaxFee, callValue: 0 },
-        parameters,
-        hexFrom
-      )
+    const address = await this.getAddress()
 
-    const unsignedTx = txResult.transaction
-    const signature = await this._signingKey.sign(unsignedTx.txID)
-    unsignedTx.signature = [signature]
-
-    const result = await this._tronWeb.trx.sendRawTransaction(unsignedTx)
-
-    if (!result || !result.result) {
-      throw new Error(
-        result
-          ? result.code || JSON.stringify(result)
-          : 'Empty response from network'
-      )
+    const options = { 
+      feeLimit: this._config.transferMaxFee, 
+      callValue: 0 
     }
 
-    return { hash: result.txid, fee }
-  }
-
-  /**
-   * Quotes the costs of a token transfer operation.
-   * @param {TransferOptions} options - The transfer's options.
-   * @returns {Promise<Omit<TransferResult, "hash">>} The transfer's quotes.
-   */
-  async quoteTransfer (options) {
-    const { recipient, token, amount } = options
-    const from = await this.getAddress()
-    const functionSelector = 'transfer(address,uint256)'
-    const parameter = [
+    const parameters = [
       { type: 'address', value: this._tronWeb.address.toHex(recipient) },
       { type: 'uint256', value: amount }
     ]
 
-    const simulationResult = await this._tronWeb.transactionBuilder.triggerConstantContract(
-      token,
-      functionSelector,
-      {},
-      parameter,
-      from
-    )
+    const issuerAddress = this._tronWeb.address.toHex(address)
 
-    // eslint-disable-next-line
-    const energy_required = simulationResult.energy_used
+    const { transaction } = await this._tronWeb.transactionBuilder
+      .triggerSmartContract(token, 'transfer(address,uint256)', options, parameters, issuerAddress)
 
-    // eslint-disable-next-line
-    if (energy_required === undefined) {
-      throw new Error('Could not estimate energy. The transaction may fail.')
+    const signedTransaction = await this._signTransaction(transaction)
+
+    const { txid } = await this._tronWeb.trx.sendRawTransaction(signedTransaction)
+
+    return { hash: txid, fee }
+  }
+
+  /**
+   * Quotes the costs of transfer operation.
+   * 
+   * @see {@link transfer}
+   * @param {TransferOptions} options - The transfer's options.
+   * @returns {Promise<Omit<TransferResult, 'hash'>>} The transfer's quotes.
+   */
+  async quoteTransfer ({ token, recipient, amount }) {
+    if (!this._tronWeb) {
+      throw new Error('The wallet must be connected to tron web to quote transfer operations.')
     }
 
-    const chainParams = await this._tronWeb.trx.getChainParameters()
-    const energyPrice = chainParams.find(param => param.key === 'getEnergyFee').value
-    const resources = await this._tronWeb.trx.getAccountResources(from)
+    const address = await this.getAddress()
+
+    const parameters = [
+      { type: 'address', value: this._tronWeb.address.toHex(recipient) },
+      { type: 'uint256', value: amount }
+    ]
+
+    const issuerAddress = this._tronWeb.address.toHex(address)
+
+    // eslint-disable-next-line camelcase
+    const { transaction, energy_used } = await this._tronWeb.transactionBuilder
+      .triggerConstantContract(token, 'transfer(address,uint256)', {}, parameters, issuerAddress)
+
+    const chainParameters = await this._tronWeb.trx.getChainParameters()
+    const { value } = chainParameters.find(({ key }) => key === 'getEnergyFee')
+
+    const resources = await this._tronWeb.trx.getAccountResources(address)
     const availableEnergy = (resources.EnergyLimit || 0) - (resources.EnergyUsed || 0)
+    const energyCost = availableEnergy < energy_used ? Math.ceil(energy_used * value) : 0
 
-    let energyCostInSun = 0
+    const bandwidthCost = await this._getBandwidthCost(transaction.raw_data_hex)
 
-    // eslint-disable-next-line
-    if (availableEnergy < energy_required) {
-      // eslint-disable-next-line
-      energyCostInSun = Math.ceil(energy_required * energyPrice)
-    }
-
-    // eslint-disable-next-line
-    const bandwidthCostInSun = await this._calculateBandwidthCost(simulationResult.transaction.raw_data_hex)
-
-    const fee = energyCostInSun + bandwidthCostInSun
+    const fee = energyCost + bandwidthCost
 
     return { fee }
   }
@@ -397,70 +344,57 @@ export default class WalletAccountTron {
   async getTransactionReceipt (hash) {
     const receipt = await this._tronWeb.trx.getTransactionInfo(hash)
 
-    if (!receipt || Object.keys(receipt).length === 0) {
-      return null
-    }
-
     return receipt
   }
 
   /**
-     * Disposes the wallet account, and erases the private key from the memory.
-     */
+   * Disposes the wallet account, erasing the private key from the memory.
+   */
   dispose () {
-    sodium.sodium_memzero(this._privateKeyBuffer)
-    sodium.sodium_memzero(this._hmacOutputBuffer)
-    sodium.sodium_memzero(this._derivationDataBuffer)
-
-    this._privateKeyBuffer = null
-    this._hmacOutputBuffer = null
-    this._derivationDataBuffer = null
-    this._signingKey = null
-    this._tronWeb = null
+    this._account.dispose()
   }
 
+  /** @private */
   async _signTransaction (transaction) {
     if (transaction.raw_data) {
-      // This is a regular TRX transfer
-      const signature = await this._signingKey.sign(transaction.txID)
-      transaction.signature = [signature]
-      return transaction
+      const signature = await this._account.signingKey.sign(transaction.txID)
+
+      return {
+        ...transaction,
+        signature: [signature]
+      }
     }
 
-    // This is a smart contract call
-    const rawTx = await this._tronWeb.transactionBuilder.triggerSmartContract(
-      transaction.to,
-      transaction.functionSelector,
-      transaction.options,
-      transaction.parameters,
-      transaction.issuerAddress
-    )
+    const { to, functionSelector, options, parameters, issuerAddress } = transaction
 
-    const signature = await this._signingKey.sign(rawTx)
-    transaction.signature = [signature]
-    return transaction
+    const rawTransaction = await this._tronWeb.transactionBuilder
+      .triggerSmartContract(to, functionSelector, options, parameters, issuerAddress)
+
+    const signature = await this._account.signingKey.sign(rawTransaction)
+
+    return {
+      ...transaction,
+      signature: [signature]
+    }
   }
 
-  /**
-   * Calculates transaction cost based on bandwidth consumption.
-   * @protected
-   * @param {string} rawDataHex - The raw transaction data in hex format
-   * @returns {Promise<number>} The transaction cost in sun (1 TRX = 1,000,000 sun)
-   */
-  async _calculateBandwidthCost (rawDataHex) {
-    const from = await this.getAddress()
-    const resources = await this._tronWeb.trx.getAccountResources(from)
-    const txSizeBytes = rawDataHex.length / 2
-    const requiredBandwidth = txSizeBytes * 2
+  /** @private */
+  async _getBandwidthCost (rawDataHex) {
+    const address = await this.getAddress()
+
+    const resources = await this._tronWeb.trx.getAccountResources(address)
+
     const freeBandwidthLeft = (resources.freeNetLimit || 0) - (resources.freeNetUsed || 0)
     const frozenBandwidthLeft = (resources.NetLimit || 0) - (resources.NetUsed || 0)
     const totalAvailableBandwidth = freeBandwidthLeft + frozenBandwidthLeft
-    const missingBandwidth = Math.max(0, requiredBandwidth - totalAvailableBandwidth)
+    const missingBandwidth = rawDataHex.length - totalAvailableBandwidth
 
-    if (missingBandwidth === 0) {
+    if (missingBandwidth <= 0) {
       return 0
     }
 
-    return Math.ceil(requiredBandwidth * BANDWIDTH_PRICE)
+    const bandwitdth = Math.ceil(rawDataHex.length * BANDWIDTH_PRICE)
+
+    return bandwitdth
   }
 }
