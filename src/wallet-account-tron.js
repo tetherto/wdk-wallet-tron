@@ -22,7 +22,9 @@ import * as bip39 from 'bip39'
 
 import MemorySafeHDNodeWallet from './memory-safe/hd-node-wallet.js'
 
-/** @typedef {import('tronweb').Types.TransactionInfo} TronTransactionReceipt */
+/** @typedef {import('ethers').HDNodeWallet} HDNodeWallet */
+
+/** @typedef {import('tronweb').TransactionInfo} TronTransactionReceipt */
 
 /** @typedef {import('@wdk/wallet').IWalletAccount} IWalletAccount */
 
