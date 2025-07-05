@@ -16,6 +16,7 @@
 
 import TronWeb from 'tronweb'
 
+// eslint-disable-next-line camelcase
 import { keccak_256 } from '@noble/hashes/sha3'
 
 import * as bip39 from 'bip39'
@@ -203,11 +204,11 @@ export default class WalletAccountTron {
     }
 
     const address = await this.getAddress()
+    const addressHex = this._tronWeb.address.toHex(address)
     const parameters = [{ type: 'address', value: addressHex }]
-    const issuerAddress = this._tronWeb.address.toHex(address)
 
     const result = await this._tronWeb.transactionBuilder
-      .triggerConstantContract(tokenAddress, 'balanceOf(address)', { }, parameters, issuerAddress)
+      .triggerConstantContract(tokenAddress, 'balanceOf(address)', { }, parameters, addressHex)
 
     const balance = this._tronWeb.toBigNumber('0x' + result.constant_result[0])
 
@@ -216,7 +217,7 @@ export default class WalletAccountTron {
 
   /**
    * Sends a transaction.
-   * 
+   *
    * @param {TronTransaction} tx - The transaction.
    * @returns {Promise<TransactionResult>} The transaction's result.
    */
@@ -258,7 +259,7 @@ export default class WalletAccountTron {
 
   /**
    * Transfers a token to another address.
-   * 
+   *
    * @param {TransferOptions} options - The transfer's options.
    * @returns {Promise<TransferResult>} The transfer's result.
    */
@@ -266,7 +267,7 @@ export default class WalletAccountTron {
     if (!this._tronWeb) {
       throw new Error('The wallet must be connected to tron web to transfer tokens.')
     }
-    
+
     const { fee } = await this.quoteTransfer({ token, recipient, amount })
 
     // eslint-disable-next-line eqeqeq
@@ -275,10 +276,11 @@ export default class WalletAccountTron {
     }
 
     const address = await this.getAddress()
+    const addressHex = this._tronWeb.address.toHex(address)
 
-    const options = { 
-      feeLimit: this._config.transferMaxFee, 
-      callValue: 0 
+    const options = {
+      feeLimit: this._config.transferMaxFee,
+      callValue: 0
     }
 
     const parameters = [
@@ -286,10 +288,8 @@ export default class WalletAccountTron {
       { type: 'uint256', value: amount }
     ]
 
-    const issuerAddress = this._tronWeb.address.toHex(address)
-
     const { transaction } = await this._tronWeb.transactionBuilder
-      .triggerSmartContract(token, 'transfer(address,uint256)', options, parameters, issuerAddress)
+      .triggerSmartContract(token, 'transfer(address,uint256)', options, parameters, addressHex)
 
     const signedTransaction = await this._signTransaction(transaction)
 
@@ -300,7 +300,7 @@ export default class WalletAccountTron {
 
   /**
    * Quotes the costs of transfer operation.
-   * 
+   *
    * @see {@link transfer}
    * @param {TransferOptions} options - The transfer's options.
    * @returns {Promise<Omit<TransferResult, 'hash'>>} The transfer's quotes.
@@ -311,23 +311,24 @@ export default class WalletAccountTron {
     }
 
     const address = await this.getAddress()
+    const addressHex = this._tronWeb.address.toHex(address)
 
     const parameters = [
       { type: 'address', value: this._tronWeb.address.toHex(recipient) },
       { type: 'uint256', value: amount }
     ]
 
-    const issuerAddress = this._tronWeb.address.toHex(address)
-
     // eslint-disable-next-line camelcase
     const { transaction, energy_used } = await this._tronWeb.transactionBuilder
-      .triggerConstantContract(token, 'transfer(address,uint256)', {}, parameters, issuerAddress)
+      .triggerConstantContract(token, 'transfer(address,uint256)', {}, parameters, addressHex)
 
     const chainParameters = await this._tronWeb.trx.getChainParameters()
     const { value } = chainParameters.find(({ key }) => key === 'getEnergyFee')
 
     const resources = await this._tronWeb.trx.getAccountResources(address)
     const availableEnergy = (resources.EnergyLimit || 0) - (resources.EnergyUsed || 0)
+
+    // eslint-disable-next-line camelcase
     const energyCost = availableEnergy < energy_used ? Math.ceil(energy_used * value) : 0
 
     const bandwidthCost = await this._getBandwidthCost(transaction.raw_data_hex)
