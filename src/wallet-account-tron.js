@@ -18,6 +18,7 @@ import TronWeb from 'tronweb'
 
 // eslint-disable-next-line camelcase
 import { keccak_256 } from '@noble/hashes/sha3'
+import { getBytes } from 'ethers'
 
 import * as bip39 from 'bip39'
 
@@ -139,7 +140,7 @@ export default class WalletAccountTron {
    * @returns {Promise<string>} The account's address.
    */
   async getAddress () {
-    const publicKey = this._account.signingKey.publicKey.slice(1)
+    const publicKey = this._account.signingKey.publicKeyBuffer.slice(1)
     const publicKeyHash = keccak_256(publicKey)
     const addressBytes = publicKeyHash.slice(12)
 

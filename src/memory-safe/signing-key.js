@@ -38,7 +38,7 @@ export default class MemorySafeSigningKey extends SigningKey {
   }
 
   get publicKey () {
-    return SigningKey.computePublicKey(this.#privateKeyBuffer)
+    return SigningKey.computePublicKey(this.#privateKeyBuffer, false)
   }
 
   get compressedPublicKey () {
@@ -50,6 +50,10 @@ export default class MemorySafeSigningKey extends SigningKey {
   }
 
   get publicKeyBuffer () {
+    return secp256k1.getPublicKey(this.#privateKeyBuffer, false)
+  }
+
+  get compressedPublicKeyBuffer () {
     return secp256k1.getPublicKey(this.#privateKeyBuffer, true)
   }
 
