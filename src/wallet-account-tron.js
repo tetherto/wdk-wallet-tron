@@ -360,25 +360,11 @@ export default class WalletAccountTron {
 
   /** @private */
   async _signTransaction (transaction) {
-    if (transaction.raw_data) {
-      const signature = await this._account.signingKey.sign('0x' + transaction.txID)
-
-      return {
-        ...transaction,
-        signature: [signature.serialized]
-      }
-    }
-
-    const { to, functionSelector, options, parameters, issuerAddress } = transaction
-
-    const rawTransaction = await this._tronWeb.transactionBuilder
-      .triggerSmartContract(to, functionSelector, options, parameters, issuerAddress)
-
-    const signature = await this._account.signingKey.sign(rawTransaction)
+    const signature = await this._account.signingKey.sign('0x' + transaction.txID)
 
     return {
       ...transaction,
-      signature: [signature]
+      signature: [signature.serialized]
     }
   }
 
