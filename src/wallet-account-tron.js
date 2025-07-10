@@ -18,7 +18,6 @@ import TronWeb from 'tronweb'
 
 // eslint-disable-next-line camelcase
 import { keccak_256 } from '@noble/hashes/sha3'
-import { getBytes } from 'ethers'
 
 import * as bip39 from 'bip39'
 
@@ -160,6 +159,7 @@ export default class WalletAccountTron {
   async sign (message) {
     const messageWithPrefix = Buffer.from(TRON_MESSAGE_PREFIX + message.length + message, 'utf8')
     const hash = keccak_256(messageWithPrefix)
+
     const { serialized } = this._account.signingKey.sign(hash)
 
     return serialized
@@ -209,7 +209,7 @@ export default class WalletAccountTron {
     const parameters = [{ type: 'address', value: addressHex }]
 
     const result = await this._tronWeb.transactionBuilder
-      .triggerConstantContract(tokenAddress, 'balanceOf(address)', { }, parameters, addressHex)
+      .triggerConstantContract(tokenAddress, 'balanceOf(address)', {}, parameters, addressHex)
 
     const balance = this._tronWeb.toBigNumber('0x' + result.constant_result[0])
 
@@ -361,11 +361,11 @@ export default class WalletAccountTron {
   /** @private */
   async _signTransaction (transaction) {
     if (transaction.raw_data) {
-      const signature = await this._account.signingKey.sign(transaction.txID)
+      const signature = await this._account.signingKey.sign('0x' + transaction.txID)
 
       return {
         ...transaction,
-        signature: [signature]
+        signature: [signature.serialized]
       }
     }
 
