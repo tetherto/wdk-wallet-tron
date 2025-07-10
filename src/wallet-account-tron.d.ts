@@ -19,9 +19,9 @@ export default class WalletAccountTron implements IWalletAccount {
      * The account.
      *
      * @protected
-     * @type {HDNodeWallet}
+     * @type {MemorySafeHDNodeWallet}
      */
-    protected _account: HDNodeWallet;
+    protected _account: MemorySafeHDNodeWallet;
     /**
      * The tron web client.
      *
@@ -127,7 +127,6 @@ export default class WalletAccountTron implements IWalletAccount {
     /** @private */
     private _getBandwidthCost;
 }
-export type HDNodeWallet = import("ethers").HDNodeWallet;
 export type TronTransactionReceipt = import("tronweb").TransactionInfo;
 export type IWalletAccount = import("@wdk/wallet").IWalletAccount;
 export type KeyPair = import("@wdk/wallet").KeyPair;
@@ -151,3 +150,4 @@ export type TronWalletConfig = {
     provider?: string | TronWeb;
 };
 import TronWeb from 'tronweb'
+

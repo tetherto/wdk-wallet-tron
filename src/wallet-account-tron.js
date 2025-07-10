@@ -18,12 +18,11 @@ import TronWeb from 'tronweb'
 
 // eslint-disable-next-line camelcase
 import { keccak_256 } from '@noble/hashes/sha3'
+import { hexToBytes } from '@noble/hashes/utils'
 
 import * as bip39 from 'bip39'
 
 import MemorySafeHDNodeWallet from './memory-safe/hd-node-wallet.js'
-
-/** @typedef {import('ethers').HDNodeWallet} HDNodeWallet */
 
 /** @typedef {import('tronweb').TransactionInfo} TronTransactionReceipt */
 
@@ -83,10 +82,9 @@ export default class WalletAccountTron {
      * The account.
      *
      * @protected
-     * @type {HDNodeWallet}
+     * @type {MemorySafeHDNodeWallet}
      */
-    this._account = MemorySafeHDNodeWallet.fromSeed(seed)
-      .derivePath(path)
+    this._account = MemorySafeHDNodeWallet.fromSeed(seed).derivePath(path)
 
     const { provider } = config
 
@@ -139,7 +137,7 @@ export default class WalletAccountTron {
    * @returns {Promise<string>} The account's address.
    */
   async getAddress () {
-    const publicKey = this._account.signingKey.publicKeyBuffer.slice(1)
+    const publicKey = this._account.signingKey.publicKey.slice(1)
     const publicKeyHash = keccak_256(publicKey)
     const addressBytes = publicKeyHash.slice(12)
 
@@ -159,10 +157,13 @@ export default class WalletAccountTron {
   async sign (message) {
     const messageWithPrefix = Buffer.from(TRON_MESSAGE_PREFIX + message.length + message, 'utf8')
     const hash = keccak_256(messageWithPrefix)
+    const sig = this._account.signingKey.sign(hash)
+    const rHex = sig.r.toString(16).padStart(64, '0')
+    const sHex = sig.s.toString(16).padStart(64, '0')
+    const v = sig.recovery + 27
+    const vHex = v.toString(16)
 
-    const { serialized } = this._account.signingKey.sign(hash)
-
-    return serialized
+    return '0x' + rHex + sHex + vHex
   }
 
   /**
@@ -360,11 +361,16 @@ export default class WalletAccountTron {
 
   /** @private */
   async _signTransaction (transaction) {
-    const signature = await this._account.signingKey.sign('0x' + transaction.txID)
+    const hashBytes = hexToBytes(transaction.txID)
+    const sig = this._account.signingKey.sign(hashBytes)
+    const rHex = sig.r.toString(16).padStart(64, '0')
+    const sHex = sig.s.toString(16).padStart(64, '0')
+    const vHex = sig.recovery.toString(16).padStart(2, '0')
+    const serializedSignature = rHex + sHex + vHex
 
     return {
       ...transaction,
-      signature: [signature.serialized]
+      signature: [serializedSignature]
     }
   }
 
