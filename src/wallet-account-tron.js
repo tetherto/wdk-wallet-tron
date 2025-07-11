@@ -356,8 +356,13 @@ export default class WalletAccountTron {
    * @returns {Promise<TronTransactionReceipt | null>} The receipt, or null if the transaction has not been included in a block yet.
    */
   async getTransactionReceipt (hash) {
+    if (!this._tronWeb) {
+      throw new Error('The wallet must be connected to tron web to fetch transaction receipts.')
+    }
+
     const receipt = await this._tronWeb.trx.getTransactionInfo(hash)
-    if (receipt && Object.keys(receipt).length === 0 && receipt.constructor === Object) {
+
+    if (!receipt || Object.keys(receipt).length === 0) {
       return null
     }
 
@@ -376,11 +381,14 @@ export default class WalletAccountTron {
   /** @private */
   async _signTransaction (transaction) {
     const transactionBytes = Buffer.from(transaction.txID, 'hex')
-    const sig = secp256k1.sign(transactionBytes, this._account.privateKey, { lowS: true })
-    const rHex = sig.r.toString(16).padStart(64, '0')
-    const sHex = sig.s.toString(16).padStart(64, '0')
-    const vHex = sig.recovery.toString(16).padStart(2, '0')
-    const serializedSignature = rHex + sHex + vHex
+
+    const signature = secp256k1.sign(transactionBytes, this._account.privateKey, { lowS: true })
+
+    const r = signature.r.toString(16).padStart(64, '0'),
+          s = signature.s.toString(16).padStart(64, '0'),
+          v = signature.recovery.toString(16).padStart(2, '0')
+
+    const serializedSignature = r + s + v
 
     return {
       ...transaction,
