@@ -1,0 +1,136 @@
+// Copyright 2024 Tether Operations Limited
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+'use strict'
+
+import AbstractWalletManager from '@wdk/wallet'
+
+import TronWeb from 'tronweb'
+
+import WalletAccountTron from './wallet-account-tron.js'
+
+/** @typedef {import("@wdk/wallet").FeeRates} FeeRates */
+
+/** @typedef {import('./wallet-account-tron.js').TronWalletConfig} TronWalletConfig */
+
+const FEE_RATE_NORMAL_MULTIPLIER = 1.1
+
+const FEE_RATE_FAST_MULTIPLIER = 2.0
+
+export default class WalletManagerTron extends AbstractWalletManager {
+  /**
+   * Creates a new wallet manager for the tron blockchain.
+   *
+   * @param {string | Uint8Array} seed - The wallet's BIP-39 seed phrase.
+   * @param {TronWalletConfig} [config] - The configuration object.
+   */
+  constructor (seed, config = {}) {
+    super(seed, config)
+
+    /**
+     * The tron wallet configuration.
+     *
+     * @protected
+     * @type {TronWalletConfig}
+     */
+    this._config = config
+
+    /**
+     * A map between derivation paths and wallet accounts. It contains all the wallet accounts that have been accessed through the {@link getAccount} and {@link getAccountByPath} methods.
+     *
+     * @protected
+     * @type {{ [path: string]: WalletAccountTron }}
+     */
+    this._accounts = {}
+
+    const { provider } = config
+
+    if (provider) {
+      /**
+       * The tron web client.
+       *
+       * @protected
+       * @type {TronWeb | undefined}
+       */
+      this._tronWeb = typeof provider === 'string'
+        ? new TronWeb({ fullHost: provider })
+        : provider
+    }
+  }
+
+  /**
+   * Returns the wallet account at a specific index (see [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki)).
+   *
+   * @example
+   * // Returns the account with derivation path m/44'/195'/0'/0/1
+   * const account = await wallet.getAccount(1);
+   * @param {number} [index] - The index of the account to get (default: 0).
+   * @returns {Promise<WalletAccountTron>} The account.
+   */
+  async getAccount (index = 0) {
+    return await this.getAccountByPath(`0'/0/${index}`)
+  }
+
+  /**
+   * Returns the wallet account at a specific BIP-44 derivation path.
+   *
+   * @example
+   * // Returns the account with derivation path m/44'/195'/0'/0/1
+   * const account = await wallet.getAccountByPath("0'/0/1");
+   * @param {string} path - The derivation path (e.g. "0'/0/0").
+   * @returns {Promise<WalletAccountTron>} The account.
+   */
+  async getAccountByPath (path) {
+    if (!this._accounts[path]) {
+      const account = new WalletAccountTron(this.seed, path, this._config)
+
+      this._accounts[path] = account
+    }
+
+    return this._accounts[path]
+  }
+
+  /**
+   * Returns the current fee rates.
+   *
+   * @returns {Promise<FeeRates>} The fee rates.
+   */
+  async getFeeRates () {
+    if (!this._tronWeb) {
+      throw new Error('The wallet must be connected to tron web to get fee rates.')
+    }
+
+    const chainParameters = await this._tronWeb.trx.getChainParameters()
+
+    const getTransactionFee = chainParameters.find(({ key }) => key === 'getTransactionFee')
+
+    const fee = Number(getTransactionFee.value)
+
+    return {
+      normal: Math.round(fee * FEE_RATE_NORMAL_MULTIPLIER),
+      fast: fee * FEE_RATE_FAST_MULTIPLIER
+    }
+  }
+
+  /**
+   * Disposes all the wallet accounts, erasing their private keys from the memory.
+   */
+  dispose () {
+    for (const account of Object.values(this._accounts)) {
+      account.dispose()
+    }
+
+    this._accounts = {}
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "include": [
+    "index.js",
+    "src/wallet-manager-tron.js",
+    "src/wallet-account-tron.js"
+  ],
+  "compilerOptions": {
+    "target": "ES2015",
+    "module": "NodeNext",
+    "moduleResolution": "nodenext",
+    "allowJs": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "noResolve": true,
+    "skipLibCheck": true,
+    "typeRoots": [
+      "./node_modules/@types",
+      "./node_modules/@wdk"
+    ]
+  }
+}
