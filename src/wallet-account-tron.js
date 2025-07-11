@@ -358,6 +358,9 @@ export default class WalletAccountTron {
    */
   async getTransactionReceipt (hash) {
     const receipt = await this._tronWeb.trx.getTransactionInfo(hash)
+    if (receipt && Object.keys(receipt).length === 0 && receipt.constructor === Object) {
+      return null
+    }
 
     return receipt
   }
