@@ -8,6 +8,8 @@ export default class WalletAccountTron implements IWalletAccount {
      * @param {TronWalletConfig} [config] - The configuration object.
      */
     constructor(seed: string | Uint8Array, path: string, config?: TronWalletConfig);
+    /** @private */
+    private _path;
     /**
      * The tron wallet account configuration.
      *
@@ -19,9 +21,9 @@ export default class WalletAccountTron implements IWalletAccount {
      * The account.
      *
      * @protected
-     * @type {MemorySafeHDNodeWallet}
+     * @type {HDKey}
      */
-    protected _account: MemorySafeHDNodeWallet;
+    protected _account: HDKey;
     /**
      * The tron web client.
      *
@@ -150,4 +152,4 @@ export type TronWalletConfig = {
     provider?: string | TronWeb;
 };
 import TronWeb from 'tronweb'
-
+import { HDKey } from '@scure/bip32'

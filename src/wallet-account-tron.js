@@ -20,9 +20,13 @@ import TronWeb from 'tronweb'
 import { keccak_256 } from '@noble/hashes/sha3'
 import { hexToBytes } from '@noble/hashes/utils'
 
+import { secp256k1 } from '@noble/curves/secp256k1'
+
+import { HDKey } from '@scure/bip32'
+
 import * as bip39 from 'bip39'
 
-import MemorySafeHDNodeWallet from './memory-safe/hd-node-wallet.js'
+import { sodium_memzero } from 'sodium-universal'
 
 /** @typedef {import('tronweb').TransactionInfo} TronTransactionReceipt */
 
@@ -46,8 +50,6 @@ import MemorySafeHDNodeWallet from './memory-safe/hd-node-wallet.js'
 
 const BIP_44_TRON_DERIVATION_PATH_PREFIX = "m/44'/195'"
 
-const TRON_MESSAGE_PREFIX = '\x19Tron Signed Message:\n'
-
 const BANDWIDTH_PRICE = 1_000
 
 /** @implements {IWalletAccount} */
@@ -68,7 +70,8 @@ export default class WalletAccountTron {
       seed = bip39.mnemonicToSeedSync(seed)
     }
 
-    path = BIP_44_TRON_DERIVATION_PATH_PREFIX + '/' + path
+    /** @private */
+    this._path = BIP_44_TRON_DERIVATION_PATH_PREFIX + '/' + path
 
     /**
      * The tron wallet account configuration.
@@ -82,9 +85,9 @@ export default class WalletAccountTron {
      * The account.
      *
      * @protected
-     * @type {MemorySafeHDNodeWallet}
+     * @type {HDKey}
      */
-    this._account = MemorySafeHDNodeWallet.fromSeed(seed).derivePath(path)
+    this._account = HDKey.fromMasterSeed(seed).derive(this._path)
 
     const { provider } = config
 
@@ -107,7 +110,7 @@ export default class WalletAccountTron {
    * @type {number}
    */
   get index () {
-    return this._account.index
+    return +this._path.split('/').pop()
   }
 
   /**
@@ -116,7 +119,7 @@ export default class WalletAccountTron {
    * @type {string}
    */
   get path () {
-    return this._account.path
+    return this._path
   }
 
   /**
@@ -126,8 +129,8 @@ export default class WalletAccountTron {
    */
   get keyPair () {
     return {
-      privateKey: this._account.privateKeyBuffer,
-      publicKey: this._account.publicKeyBuffer
+      privateKey: this._account.privateKey,
+      publicKey: this._account.publicKey
     }
   }
 
@@ -137,13 +140,15 @@ export default class WalletAccountTron {
    * @returns {Promise<string>} The account's address.
    */
   async getAddress () {
-    const publicKey = this._account.signingKey.publicKey.slice(1)
-    const publicKeyHash = keccak_256(publicKey)
-    const addressBytes = publicKeyHash.slice(12)
+    const uncompressedPublicKey = secp256k1.Point.fromHex(this._account.publicKey)
+      .toRawBytes(false)
+      .slice(1)
 
+    const publicKeyHash = keccak_256(uncompressedPublicKey)
+    const addressBytes = publicKeyHash.slice(12)
     const addressHex = '41' + Buffer.from(addressBytes).toString('hex')
 
-    const address = this._tronWeb.address.fromHex(addressHex)
+    const address = TronWeb.address.fromHex(addressHex)
 
     return address
   }
@@ -155,15 +160,13 @@ export default class WalletAccountTron {
    * @returns {Promise<string>} The message's signature.
    */
   async sign (message) {
-    const messageWithPrefix = Buffer.from(TRON_MESSAGE_PREFIX + message.length + message, 'utf8')
-    const hash = keccak_256(messageWithPrefix)
-    const sig = this._account.signingKey.sign(hash)
-    const rHex = sig.r.toString(16).padStart(64, '0')
-    const sHex = sig.s.toString(16).padStart(64, '0')
-    const v = sig.recovery + 27
-    const vHex = v.toString(16)
+    const messageBytes = Buffer.from(message, 'utf8')
+    const messageHash = keccak_256(messageBytes)
+    const signatureBytes = this._account.sign(messageHash)
 
-    return '0x' + rHex + sHex + vHex
+    const signature = Buffer.from(signatureBytes).toString('hex')
+
+    return signature
   }
 
   /**
@@ -174,7 +177,14 @@ export default class WalletAccountTron {
    * @returns {Promise<boolean>} True if the signature is valid.
    */
   async verify (message, signature) {
-    return await this.sign(message) === signature
+    const messageBytes = Buffer.from(message, 'utf8'),
+          signatureBytes = Buffer.from(signature, 'hex')
+
+    const messageHash = keccak_256(messageBytes)
+    
+    const isValid = this._account.verify(messageHash, signatureBytes)
+
+    return isValid
   }
 
   /**
@@ -356,21 +366,22 @@ export default class WalletAccountTron {
    * Disposes the wallet account, erasing the private key from the memory.
    */
   dispose () {
-    this._account.dispose()
+    sodium_memzero(this._keyPair.privateKey)
+
+    this._keyPair.privateKey = undefined
   }
 
   /** @private */
   async _signTransaction (transaction) {
-    const hashBytes = hexToBytes(transaction.txID)
-    const sig = this._account.signingKey.sign(hashBytes)
-    const rHex = sig.r.toString(16).padStart(64, '0')
-    const sHex = sig.s.toString(16).padStart(64, '0')
-    const vHex = sig.recovery.toString(16).padStart(2, '0')
-    const serializedSignature = rHex + sHex + vHex
+    const transactionBytes = Buffer.from(transaction.txID, 'hex')
+    const transactionHash = keccak_256(transactionBytes)
+    const signatureBytes = this._account.sign(transactionHash)
+
+    const signature = Buffer.from(signatureBytes).toString('hex')
 
     return {
       ...transaction,
-      signature: [serializedSignature]
+      signature: [signature]
     }
   }
 
