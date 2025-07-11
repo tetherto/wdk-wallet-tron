@@ -18,7 +18,6 @@ import TronWeb from 'tronweb'
 
 // eslint-disable-next-line camelcase
 import { keccak_256 } from '@noble/hashes/sha3'
-import { hexToBytes } from '@noble/hashes/utils'
 
 import { secp256k1 } from '@noble/curves/secp256k1'
 
@@ -377,14 +376,15 @@ export default class WalletAccountTron {
   /** @private */
   async _signTransaction (transaction) {
     const transactionBytes = Buffer.from(transaction.txID, 'hex')
-    const transactionHash = keccak_256(transactionBytes)
-    const signatureBytes = this._account.sign(transactionHash)
-
-    const signature = Buffer.from(signatureBytes).toString('hex')
+    const sig = secp256k1.sign(transactionBytes, this._account.privateKey, { lowS: true })
+    const rHex = sig.r.toString(16).padStart(64, '0')
+    const sHex = sig.s.toString(16).padStart(64, '0')
+    const vHex = sig.recovery.toString(16).padStart(2, '0')
+    const serializedSignature = rHex + sHex + vHex
 
     return {
       ...transaction,
-      signature: [signature]
+      signature: [serializedSignature]
     }
   }
 
