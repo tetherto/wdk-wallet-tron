@@ -7,3 +7,4 @@ export type TransferOptions = import("@wdk/wallet").TransferOptions;
 export type TransferResult = import("@wdk/wallet").TransferResult;
 export type TronWalletConfig = import("./src/wallet-manager-tron.js").TronWalletConfig;
 export type TronTransaction = import("./src/wallet-account-tron.js").TronTransaction;
+export type TronTransactionReceipt = import("./src/wallet-account-tron.js").TronTransactionReceipt;
