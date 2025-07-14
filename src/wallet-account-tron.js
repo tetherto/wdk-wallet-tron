@@ -373,9 +373,11 @@ export default class WalletAccountTron {
    * Disposes the wallet account, erasing the private key from the memory.
    */
   dispose () {
-    sodium_memzero(this._keyPair.privateKey)
+    sodium_memzero(this._account.privKeyBytes)
 
-    this._keyPair.privateKey = undefined
+    this._account.privKeyBytes = undefined
+
+    this._account.privKey = undefined
   }
 
   /** @private */
