@@ -16,8 +16,7 @@
 
 import TronWeb from 'tronweb'
 
-// eslint-disable-next-line camelcase
-import { keccak_256 } from '@noble/hashes/sha3'
+import { keccak_256 as keccak256 } from '@noble/hashes/sha3'
 
 import { secp256k1 } from '@noble/curves/secp256k1'
 
@@ -25,7 +24,7 @@ import { HDKey } from '@scure/bip32'
 
 import * as bip39 from 'bip39'
 
-import { sodium_memzero } from 'sodium-universal'
+import { sodium_memzero as sodiumMemzero } from 'sodium-universal'
 
 /** @typedef {import('tronweb').TransactionInfo} TronTransactionReceipt */
 
@@ -143,7 +142,7 @@ export default class WalletAccountTron {
       .toRawBytes(false)
       .slice(1)
 
-    const publicKeyHash = keccak_256(uncompressedPublicKey)
+    const publicKeyHash = keccak256(uncompressedPublicKey)
     const addressBytes = publicKeyHash.slice(12)
     const addressHex = '41' + Buffer.from(addressBytes).toString('hex')
 
@@ -160,7 +159,7 @@ export default class WalletAccountTron {
    */
   async sign (message) {
     const messageBytes = Buffer.from(message, 'utf8')
-    const messageHash = keccak_256(messageBytes)
+    const messageHash = keccak256(messageBytes)
     const signatureBytes = this._account.sign(messageHash)
 
     const signature = Buffer.from(signatureBytes).toString('hex')
@@ -176,11 +175,11 @@ export default class WalletAccountTron {
    * @returns {Promise<boolean>} True if the signature is valid.
    */
   async verify (message, signature) {
-    const messageBytes = Buffer.from(message, 'utf8'),
-          signatureBytes = Buffer.from(signature, 'hex')
+    const messageBytes = Buffer.from(message, 'utf8')
+    const signatureBytes = Buffer.from(signature, 'hex')
 
-    const messageHash = keccak_256(messageBytes)
-    
+    const messageHash = keccak256(messageBytes)
+
     const isValid = this._account.verify(messageHash, signatureBytes)
 
     return isValid
@@ -281,8 +280,7 @@ export default class WalletAccountTron {
 
     const { fee } = await this.quoteTransfer({ token, recipient, amount })
 
-    // eslint-disable-next-line eqeqeq
-    if (this._config.transferMaxFee != undefined && fee >= this._config.transferMaxFee) {
+    if (this._config.transferMaxFee !== undefined && fee >= this._config.transferMaxFee) {
       throw new Error('Exceeded maximum fee cost for transfer operations.')
     }
 
@@ -329,8 +327,7 @@ export default class WalletAccountTron {
       { type: 'uint256', value: amount }
     ]
 
-    // eslint-disable-next-line camelcase
-    const { transaction, energy_used } = await this._tronWeb.transactionBuilder
+    const { transaction, energy_used: energyUsed } = await this._tronWeb.transactionBuilder
       .triggerConstantContract(token, 'transfer(address,uint256)', {}, parameters, addressHex)
 
     const chainParameters = await this._tronWeb.trx.getChainParameters()
@@ -339,8 +336,7 @@ export default class WalletAccountTron {
     const resources = await this._tronWeb.trx.getAccountResources(address)
     const availableEnergy = (resources.EnergyLimit || 0) - (resources.EnergyUsed || 0)
 
-    // eslint-disable-next-line camelcase
-    const energyCost = availableEnergy < energy_used ? Math.ceil(energy_used * value) : 0
+    const energyCost = availableEnergy < energyUsed ? Math.ceil(energyUsed * value) : 0
 
     const bandwidthCost = await this._getBandwidthCost(transaction.raw_data_hex)
 
@@ -373,7 +369,7 @@ export default class WalletAccountTron {
    * Disposes the wallet account, erasing the private key from the memory.
    */
   dispose () {
-    sodium_memzero(this._account.privKeyBytes)
+    sodiumMemzero(this._account.privKeyBytes)
 
     this._account.privKeyBytes = undefined
 
@@ -386,9 +382,9 @@ export default class WalletAccountTron {
 
     const signature = secp256k1.sign(transactionBytes, this._account.privateKey, { lowS: true })
 
-    const r = signature.r.toString(16).padStart(64, '0'),
-          s = signature.s.toString(16).padStart(64, '0'),
-          v = signature.recovery.toString(16).padStart(2, '0')
+    const r = signature.r.toString(16).padStart(64, '0')
+    const s = signature.s.toString(16).padStart(64, '0')
+    const v = signature.recovery.toString(16).padStart(2, '0')
 
     const serializedSignature = r + s + v
 
