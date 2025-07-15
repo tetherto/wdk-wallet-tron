@@ -21,6 +21,7 @@
 
 /** @typedef {import('./src/wallet-manager-tron.js').TronWalletConfig} TronWalletConfig */
 /** @typedef {import('./src/wallet-account-tron.js').TronTransaction} TronTransaction */
+/** @typedef {import('./src/wallet-account-tron.js').TronTransactionReceipt} TronTransactionReceipt */
 
 export { default } from './src/wallet-manager-tron.js'
 
