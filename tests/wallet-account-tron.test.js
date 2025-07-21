@@ -34,11 +34,24 @@ describe('WalletAccountTron', () => {
   })
 
   afterEach(() => {
-    if (account) account.dispose()
+    account.dispose()
   })
 
   describe('constructor', () => {
     test('should successfully initialize an account for the given seed phrase and path', () => {
+      const account = new WalletAccountTron(SEED_PHRASE, "0'/0/0")
+
+      expect(account.index).toBe(ACCOUNT.index)
+
+      expect(account.path).toBe(ACCOUNT.path)
+
+      expect(account.keyPair).toEqual({
+        privateKey: new Uint8Array(Buffer.from(ACCOUNT.keyPair.privateKey, 'hex')),
+        publicKey: new Uint8Array(Buffer.from(ACCOUNT.keyPair.publicKey, 'hex'))
+      })
+    })
+
+    test('should successfully initialize an account for the given seed and path', () => {
       const account = new WalletAccountTron(SEED, "0'/0/0")
 
       expect(account.index).toBe(ACCOUNT.index)
@@ -97,6 +110,11 @@ describe('WalletAccountTron', () => {
       const result = await account.verify('Another message.', SIGNATURE)
 
       expect(result).toBe(false)
+    })
+
+    test('should throw on a malformed signature', async () => {
+      await expect(account.verify(MESSAGE, 'A bad signature'))
+        .rejects.toThrow('Uint8Array expected of length 64, got length=0')
     })
   })
 
