@@ -1,8 +1,7 @@
 {
   "include": [
     "index.js",
-    "src/wallet-manager-tron.js",
-    "src/wallet-account-tron.js"
+    "src/**/*.js",
   ],
   "compilerOptions": {
     "target": "ES2015",
@@ -11,8 +10,7 @@
     "allowJs": true,
     "declaration": true,
     "emitDeclarationOnly": true,
-    "noResolve": true,
-    "skipLibCheck": true,
+    "stripInternal": true,
     "outDir": "./types"
   }
 }

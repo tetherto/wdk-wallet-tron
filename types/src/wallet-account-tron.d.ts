@@ -1,5 +1,5 @@
 /** @implements {IWalletAccount} */
-export default class WalletAccountTron implements IWalletAccount {
+export default class WalletAccountTron extends WalletAccountReadOnlyTron implements IWalletAccount {
     /**
      * Creates a new tron wallet account.
      *
@@ -18,19 +18,12 @@ export default class WalletAccountTron implements IWalletAccount {
      */
     protected _config: TronWalletConfig;
     /**
-     * The account.
+     * The account's hd key.
      *
      * @protected
      * @type {HDKey}
      */
     protected _account: HDKey;
-    /**
-     * The tron web client.
-     *
-     * @protected
-     * @type {TronWeb | undefined}
-     */
-    protected _tronWeb: TronWeb | undefined;
     /**
      * The derivation path's index of this account.
      *
@@ -50,12 +43,6 @@ export default class WalletAccountTron implements IWalletAccount {
      */
     get keyPair(): KeyPair;
     /**
-     * Returns the account's address.
-     *
-     * @returns {Promise<string>} The account's address.
-     */
-    getAddress(): Promise<string>;
-    /**
      * Signs a message.
      *
      * @param {string} message - The message to sign.
@@ -71,33 +58,12 @@ export default class WalletAccountTron implements IWalletAccount {
      */
     verify(message: string, signature: string): Promise<boolean>;
     /**
-     * Returns the account's tronix balance.
-     *
-     * @returns {Promise<number>} The tronix balance (in suns).
-     */
-    getBalance(): Promise<number>;
-    /**
-     * Returns the account balance for a specific token.
-     *
-     * @param {string} tokenAddress - The smart contract address of the token.
-     * @returns {Promise<number>} The token balance (in base unit).
-     */
-    getTokenBalance(tokenAddress: string): Promise<number>;
-    /**
      * Sends a transaction.
      *
      * @param {TronTransaction} tx - The transaction.
      * @returns {Promise<TransactionResult>} The transaction's result.
      */
     sendTransaction({ to, value }: TronTransaction): Promise<TransactionResult>;
-    /**
-     * Quotes the costs of a send transaction operation.
-     *
-     * @see {@link sendTransaction}
-     * @param {TronTransaction} tx - The transaction.
-     * @returns {Promise<Omit<TransactionResult, 'hash'>>} The transaction's quotes.
-     */
-    quoteSendTransaction({ to, value }: TronTransaction): Promise<Omit<TransactionResult, "hash">>;
     /**
      * Transfers a token to another address.
      *
@@ -106,50 +72,18 @@ export default class WalletAccountTron implements IWalletAccount {
      */
     transfer({ token, recipient, amount }: TransferOptions): Promise<TransferResult>;
     /**
-     * Quotes the costs of transfer operation.
-     *
-     * @see {@link transfer}
-     * @param {TransferOptions} options - The transfer's options.
-     * @returns {Promise<Omit<TransferResult, 'hash'>>} The transfer's quotes.
-     */
-    quoteTransfer({ token, recipient, amount }: TransferOptions): Promise<Omit<TransferResult, "hash">>;
-    /**
-     * Returns a transaction's receipt.
-     *
-     * @param {string} hash - The transaction's hash.
-     * @returns {Promise<TronTransactionReceipt | null>} The receipt, or null if the transaction has not been included in a block yet.
-     */
-    getTransactionReceipt(hash: string): Promise<TronTransactionReceipt | null>;
-    /**
      * Disposes the wallet account, erasing the private key from the memory.
      */
     dispose(): void;
     /** @private */
     private _signTransaction;
-    /** @private */
-    private _getBandwidthCost;
 }
-export type TronTransactionReceipt = import("tronweb").TransactionInfo;
 export type IWalletAccount = import("@wdk/wallet").IWalletAccount;
 export type KeyPair = import("@wdk/wallet").KeyPair;
 export type TransactionResult = import("@wdk/wallet").TransactionResult;
 export type TransferOptions = import("@wdk/wallet").TransferOptions;
 export type TransferResult = import("@wdk/wallet").TransferResult;
-export type TronTransaction = {
-    /**
-     * - The transaction's recipient.
-     */
-    to: string;
-    /**
-     * - The amount of tronixs to send to the recipient (in suns).
-     */
-    value: number;
-};
-export type TronWalletConfig = {
-    /**
-     * - The url of the tron web provider, or an instance of the {@link TronWeb} class.
-     */
-    provider?: string | TronWeb;
-};
-import TronWeb from 'tronweb'
-import { HDKey } from '@scure/bip32'
+export type TronTransaction = import("./wallet-account-read-only-tron.js").TronTransaction;
+export type TronWalletConfig = import("./wallet-account-read-only-tron.js").TronWalletConfig;
+import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js';
+import { HDKey } from '@scure/bip32';
