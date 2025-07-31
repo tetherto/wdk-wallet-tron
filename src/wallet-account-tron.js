@@ -225,6 +225,19 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
   }
 
   /**
+   * Returns a read-only copy of the account.
+   * 
+   * @returns {Promise<WalletAccountReadOnlyTron>} The read-only account.
+   */
+  async toReadOnlyAccount () {
+    const address = await this.getAddress()
+
+    const readOnlyAccount = new WalletAccountReadOnlyTron(address, this._config)
+
+    return readOnlyAccount
+  }
+
+  /**
    * Disposes the wallet account, erasing the private key from the memory.
    */
   dispose () {
