@@ -2,10 +2,10 @@ export default class WalletAccountReadOnlyTron extends AbstractWalletAccountRead
     /**
      * Creates a new tron read-only wallet account.
      *
-     * @param {string} [address] - The account's address.
+     * @param {string} address - The account's address.
      * @param {Omit<TronWalletConfig, 'transferMaxFee'>} [config] - The configuration object.
      */
-    constructor(address?: string, config?: Omit<TronWalletConfig, "transferMaxFee">);
+    constructor(address: string, config?: Omit<TronWalletConfig, "transferMaxFee">);
     /**
      * The read-only wallet account configuration.
      *

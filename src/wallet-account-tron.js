@@ -22,6 +22,7 @@ import { secp256k1 } from '@noble/curves/secp256k1'
 import { HDKey } from '@scure/bip32'
 import * as bip39 from 'bip39'
 
+// eslint-disable-next-line camelcase
 import { sodium_memzero } from 'sodium-universal'
 
 import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js'
@@ -152,11 +153,11 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    * @returns {Promise<boolean>} True if the signature is valid.
    */
   async verify (message, signature) {
-    const messageBytes = Buffer.from(message, 'utf8'),
-          signatureBytes = Buffer.from(signature, 'hex')
+    const messageBytes = Buffer.from(message, 'utf8')
+    const signatureBytes = Buffer.from(signature, 'hex')
 
     const messageHash = keccak_256(messageBytes)
-    
+
     const isValid = this._account.verify(messageHash, signatureBytes)
 
     return isValid
@@ -226,7 +227,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
 
   /**
    * Returns a read-only copy of the account.
-   * 
+   *
    * @returns {Promise<WalletAccountReadOnlyTron>} The read-only account.
    */
   async toReadOnlyAccount () {
@@ -254,9 +255,9 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
 
     const signature = secp256k1.sign(transactionBytes, this._account.privateKey, { lowS: true })
 
-    const r = signature.r.toString(16).padStart(64, '0'),
-          s = signature.s.toString(16).padStart(64, '0'),
-          v = signature.recovery.toString(16).padStart(2, '0')
+    const r = signature.r.toString(16).padStart(64, '0')
+    const s = signature.s.toString(16).padStart(64, '0')
+    const v = signature.recovery.toString(16).padStart(2, '0')
 
     const serializedSignature = r + s + v
 

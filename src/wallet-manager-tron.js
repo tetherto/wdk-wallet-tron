@@ -104,7 +104,7 @@ export default class WalletManagerTron extends AbstractWalletManager {
   /**
    * Returns the current fee rates.
    *
-   * @returns {Promise<FeeRates>} The fee rates.
+   * @returns {Promise<FeeRates>} The fee rates (in suns).
    */
   async getFeeRates () {
     if (!this._tronWeb) {

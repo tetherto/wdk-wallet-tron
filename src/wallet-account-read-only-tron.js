@@ -44,7 +44,7 @@ export default class WalletAccountReadOnlyTron extends AbstractWalletAccountRead
   /**
    * Creates a new tron read-only wallet account.
    *
-   * @param {string} [address] - The account's address.
+   * @param {string} address - The account's address.
    * @param {Omit<TronWalletConfig, 'transferMaxFee'>} [config] - The configuration object.
    */
   constructor (address, config = { }) {
@@ -195,7 +195,7 @@ export default class WalletAccountReadOnlyTron extends AbstractWalletAccountRead
 
   /**
    * Returns the bandwidth cost of a tron web's transaction.
-   * 
+   *
    * @protected
    * @param {Transaction<TriggerSmartContract>} transaction - The tron web's transaction
    * @returns {Promise<number>} The bandwidth cost.
