@@ -1,4 +1,4 @@
-export default class WalletManagerTron extends AbstractWalletManager {
+export default class WalletManagerTron extends WalletManager {
     /**
      * Creates a new wallet manager for the tron blockchain.
      *
@@ -63,5 +63,5 @@ export default class WalletManagerTron extends AbstractWalletManager {
 export type FeeRates = import("@wdk/wallet").FeeRates;
 export type TronWalletConfig = import("./wallet-account-tron.js").TronWalletConfig;
 import WalletAccountTron from './wallet-account-tron.js';
-import AbstractWalletManager from '@wdk/wallet';
+import WalletManager from '@wdk/wallet';
 import TronWeb from 'tronweb'

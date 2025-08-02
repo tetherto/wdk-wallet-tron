@@ -14,7 +14,7 @@
 
 'use strict'
 
-import { AbstractWalletAccountReadOnly } from '@wdk/wallet'
+import { WalletAccountReadOnly } from '@wdk/wallet'
 
 import TronWeb from 'tronweb'
 
@@ -40,7 +40,7 @@ import TronWeb from 'tronweb'
 
 const BANDWIDTH_PRICE = 1_000
 
-export default class WalletAccountReadOnlyTron extends AbstractWalletAccountReadOnly {
+export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
   /**
    * Creates a new tron read-only wallet account.
    *

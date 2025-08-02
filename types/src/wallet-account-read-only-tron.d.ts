@@ -1,4 +1,4 @@
-export default class WalletAccountReadOnlyTron extends AbstractWalletAccountReadOnly {
+export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     /**
      * Creates a new tron read-only wallet account.
      *
@@ -89,5 +89,5 @@ export type TronWalletConfig = {
      */
     transferMaxFee?: number;
 };
-import { AbstractWalletAccountReadOnly } from '@wdk/wallet';
+import { WalletAccountReadOnly } from '@wdk/wallet';
 import TronWeb from 'tronweb'
