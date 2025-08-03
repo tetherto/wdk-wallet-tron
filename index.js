@@ -13,16 +13,20 @@
 // limitations under the License.
 'use strict'
 
+/** @typedef {import('tronweb').TransactionInfo} TronTransactionReceipt */
+
 /** @typedef {import('@wdk/wallet').FeeRates} FeeRates */
+
 /** @typedef {import('@wdk/wallet').KeyPair} KeyPair */
 /** @typedef {import('@wdk/wallet').TransactionResult} TransactionResult */
 /** @typedef {import('@wdk/wallet').TransferOptions} TransferOptions */
 /** @typedef {import('@wdk/wallet').TransferResult} TransferResult */
 
-/** @typedef {import('./src/wallet-manager-tron.js').TronWalletConfig} TronWalletConfig */
-/** @typedef {import('./src/wallet-account-tron.js').TronTransaction} TronTransaction */
-/** @typedef {import('./src/wallet-account-tron.js').TronTransactionReceipt} TronTransactionReceipt */
+/** @typedef {import('./src/wallet-account-read-only-tron.js').TronTransaction} TronTransaction */
+/** @typedef {import('./src/wallet-account-read-only-tron.js').TronWalletConfig} TronWalletConfig */
 
 export { default } from './src/wallet-manager-tron.js'
+
+export { default as WalletAccountReadOnlyTron } from './src/wallet-account-read-only-tron.js'
 
 export { default as WalletAccountTron } from './src/wallet-account-tron.js'
