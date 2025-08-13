@@ -12,6 +12,16 @@
     "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
     "test:coverage": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --coverage"
   },
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "bare": "./bare.js",
+      "default": "./index.js"
+    },
+    "./package": {
+      "default": "./package.json"
+    }
+  },
   "dependencies": {
     "@noble/curves": "1.9.2",
     "@noble/hashes": "1.3.3",
@@ -30,12 +40,4 @@
     "standard": "17.1.2",
     "typescript": "5.8.3"
   },
-  "exports": {
-    ".": {
-      "bare": "./bare.js",
-      "types": "./types/index.d.ts",
-      "default": "./index.js"
-    },
-    "./package": "./package.json"
-  }
 }
