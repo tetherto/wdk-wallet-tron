@@ -1,5 +1,19 @@
 export default class WalletManagerTron extends WalletManager {
     /**
+     * Multiplier for normal fee rate calculations (in %).
+     *
+     * @protected
+     * @type {bigint}
+     */
+    protected static _FEE_RATE_NORMAL_MULTIPLIER: bigint;
+    /**
+     * Multiplier for fast fee rate calculations (in %).
+     *
+     * @protected
+     * @type {bigint}
+     */
+    protected static _FEE_RATE_FAST_MULTIPLIER: bigint;
+    /**
      * Creates a new wallet manager for the tron blockchain.
      *
      * @param {string | Uint8Array} seed - The wallet's BIP-39 seed phrase.
@@ -13,15 +27,6 @@ export default class WalletManagerTron extends WalletManager {
      * @type {TronWalletConfig}
      */
     protected _config: TronWalletConfig;
-    /**
-     * A map between derivation paths and wallet accounts. It contains all the wallet accounts that have been accessed through the {@link getAccount} and {@link getAccountByPath} methods.
-     *
-     * @protected
-     * @type {{ [path: string]: WalletAccountTron }}
-     */
-    protected _accounts: {
-        [path: string]: WalletAccountTron;
-    };
     /**
      * The tron web client.
      *
@@ -55,10 +60,6 @@ export default class WalletManagerTron extends WalletManager {
      * @returns {Promise<FeeRates>} The fee rates.
      */
     getFeeRates(): Promise<FeeRates>;
-    /**
-     * Disposes all the wallet accounts, erasing their private keys from the memory.
-     */
-    dispose(): void;
 }
 export type FeeRates = import("@wdk/wallet").FeeRates;
 export type TronWalletConfig = import("./wallet-account-tron.js").TronWalletConfig;

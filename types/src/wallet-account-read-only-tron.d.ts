@@ -23,16 +23,16 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     /**
      * Returns the account's tronix balance.
      *
-     * @returns {Promise<number>} The tronix balance (in suns).
+     * @returns {Promise<bigint>} The tronix balance (in suns).
      */
-    getBalance(): Promise<number>;
+    getBalance(): Promise<bigint>;
     /**
      * Returns the account balance for a specific token.
      *
      * @param {string} tokenAddress - The smart contract address of the token.
-     * @returns {Promise<number>} The token balance (in base unit).
+     * @returns {Promise<bigint>} The token balance (in base unit).
      */
-    getTokenBalance(tokenAddress: string): Promise<number>;
+    getTokenBalance(tokenAddress: string): Promise<bigint>;
     /**
      * Quotes the costs of a send transaction operation.
      *
@@ -77,7 +77,7 @@ export type TronTransaction = {
     /**
      * - The amount of tronixs to send to the recipient (in suns).
      */
-    value: number;
+    value: number | bigint;
 };
 export type TronWalletConfig = {
     /**
@@ -87,7 +87,7 @@ export type TronWalletConfig = {
     /**
      * - The maximum fee amount for transfer operations.
      */
-    transferMaxFee?: number;
+    transferMaxFee?: number | bigint;
 };
 import { WalletAccountReadOnly } from '@wdk/wallet';
 import TronWeb from 'tronweb'
