@@ -29,13 +29,13 @@ import TronWeb from 'tronweb'
 /**
  * @typedef {Object} TronTransaction
  * @property {string} to - The transaction's recipient.
- * @property {number} value - The amount of tronixs to send to the recipient (in suns).
+ * @property {number | bigint} value - The amount of tronixs to send to the recipient (in suns).
  */
 
 /**
  * @typedef {Object} TronWalletConfig
  * @property {string | TronWeb} [provider] - The url of the tron web provider, or an instance of the {@link TronWeb} class.
- * @property {number} [transferMaxFee] - The maximum fee amount for transfer operations.
+ * @property {number | bigint} [transferMaxFee] - The maximum fee amount for transfer operations.
  */
 
 const BANDWIDTH_PRICE = 1_000
@@ -76,7 +76,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
   /**
    * Returns the account's tronix balance.
    *
-   * @returns {Promise<number>} The tronix balance (in suns).
+   * @returns {Promise<bigint>} The tronix balance (in suns).
    */
   async getBalance () {
     if (!this._tronWeb) {
@@ -87,14 +87,14 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
 
     const balance = await this._tronWeb.trx.getBalance(address)
 
-    return Number(balance)
+    return BigInt(balance)
   }
 
   /**
    * Returns the account balance for a specific token.
    *
    * @param {string} tokenAddress - The smart contract address of the token.
-   * @returns {Promise<number>} The token balance (in base unit).
+   * @returns {Promise<bigint>} The token balance (in base unit).
    */
   async getTokenBalance (tokenAddress) {
     if (!this._tronWeb) {
@@ -110,7 +110,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
 
     const balance = this._tronWeb.toBigNumber('0x' + result.constant_result[0])
 
-    return Number(balance)
+    return BigInt(balance)
   }
 
   /**
@@ -129,7 +129,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     const transaction = await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
     const fee = await this._getBandwidthCost(transaction)
 
-    return { fee }
+    return { fee: BigInt(fee) }
   }
 
   /**
@@ -168,7 +168,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
 
     const fee = energyCost + bandwidthCost
 
-    return { fee }
+    return { fee: BigInt(fee) }
   }
 
   /**
@@ -183,8 +183,6 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     }
 
     const receipt = await this._tronWeb.trx.getTransactionInfo(hash)
-
-    console.log(receipt)
 
     if (!receipt || Object.keys(receipt).length === 0) {
       return null

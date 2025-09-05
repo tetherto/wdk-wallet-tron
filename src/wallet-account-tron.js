@@ -182,7 +182,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
 
     const { txid } = await this._tronWeb.trx.sendRawTransaction(signedTransaction)
 
-    return { hash: txid, fee }
+    return { hash: txid, fee: BigInt(fee) }
   }
 
   /**
@@ -206,7 +206,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
     const addressHex = this._tronWeb.address.toHex(address)
 
     const options = {
-      feeLimit: fee,
+      feeLimit: Number(fee),
       callValue: 0
     }
 

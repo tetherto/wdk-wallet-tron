@@ -63,14 +63,14 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron impleme
      * @param {TronTransaction} tx - The transaction.
      * @returns {Promise<TransactionResult>} The transaction's result.
      */
-    sendTransaction({ to, value }: TronTransaction): Promise<TransactionResult>;
+    sendTransaction(tx: TronTransaction): Promise<TransactionResult>;
     /**
      * Transfers a token to another address.
      *
      * @param {TransferOptions} options - The transfer's options.
      * @returns {Promise<TransferResult>} The transfer's result.
      */
-    transfer({ token, recipient, amount }: TransferOptions): Promise<TransferResult>;
+    transfer(options: TransferOptions): Promise<TransferResult>;
     /**
      * Returns a read-only copy of the account.
      *
