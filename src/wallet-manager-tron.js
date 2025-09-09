@@ -1,0 +1,127 @@
+// Copyright 2024 Tether Operations Limited
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+'use strict'
+
+import WalletManager from '@wdk/wallet'
+
+import TronWeb from 'tronweb'
+
+import WalletAccountTron from './wallet-account-tron.js'
+
+/** @typedef {import("@wdk/wallet").FeeRates} FeeRates */
+
+/** @typedef {import('./wallet-account-tron.js').TronWalletConfig} TronWalletConfig */
+
+export default class WalletManagerTron extends WalletManager {
+  /**
+   * Multiplier for normal fee rate calculations (in %).
+   *
+   * @protected
+   * @type {bigint}
+   */
+  static _FEE_RATE_NORMAL_MULTIPLIER = 110n
+
+  /**
+   * Multiplier for fast fee rate calculations (in %).
+   *
+   * @protected
+   * @type {bigint}
+   */
+  static _FEE_RATE_FAST_MULTIPLIER = 200n
+
+  /**
+   * Creates a new wallet manager for the tron blockchain.
+   *
+   * @param {string | Uint8Array} seed - The wallet's BIP-39 seed phrase.
+   * @param {TronWalletConfig} [config] - The configuration object.
+   */
+  constructor (seed, config = {}) {
+    super(seed, config)
+
+    /**
+     * The tron wallet configuration.
+     *
+     * @protected
+     * @type {TronWalletConfig}
+     */
+    this._config = config
+
+    const { provider } = config
+
+    if (provider) {
+      /**
+       * The tron web client.
+       *
+       * @protected
+       * @type {TronWeb | undefined}
+       */
+      this._tronWeb = typeof provider === 'string'
+        ? new TronWeb({ fullHost: provider })
+        : provider
+    }
+  }
+
+  /**
+   * Returns the wallet account at a specific index (see [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki)).
+   *
+   * @example
+   * // Returns the account with derivation path m/44'/195'/0'/0/1
+   * const account = await wallet.getAccount(1);
+   * @param {number} [index] - The index of the account to get (default: 0).
+   * @returns {Promise<WalletAccountTron>} The account.
+   */
+  async getAccount (index = 0) {
+    return await this.getAccountByPath(`0'/0/${index}`)
+  }
+
+  /**
+   * Returns the wallet account at a specific BIP-44 derivation path.
+   *
+   * @example
+   * // Returns the account with derivation path m/44'/195'/0'/0/1
+   * const account = await wallet.getAccountByPath("0'/0/1");
+   * @param {string} path - The derivation path (e.g. "0'/0/0").
+   * @returns {Promise<WalletAccountTron>} The account.
+   */
+  async getAccountByPath (path) {
+    if (!this._accounts[path]) {
+      const account = new WalletAccountTron(this.seed, path, this._config)
+
+      this._accounts[path] = account
+    }
+
+    return this._accounts[path]
+  }
+
+  /**
+   * Returns the current fee rates.
+   *
+   * @returns {Promise<FeeRates>} The fee rates (in suns).
+   */
+  async getFeeRates () {
+    if (!this._tronWeb) {
+      throw new Error('The wallet must be connected to tron web to get fee rates.')
+    }
+
+    const chainParameters = await this._tronWeb.trx.getChainParameters()
+    const getTransactionFee = chainParameters.find(({ key }) => key === 'getTransactionFee')
+    const fee = BigInt(getTransactionFee.value)
+
+    return {
+      normal: fee * WalletManagerTron._FEE_RATE_NORMAL_MULTIPLIER / 100n,
+      fast: fee * WalletManagerTron._FEE_RATE_FAST_MULTIPLIER / 100n
+    }
+  }
+}
