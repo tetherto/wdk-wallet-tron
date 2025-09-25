@@ -66,9 +66,9 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
 export type Transaction<T> = import("tronweb").Transaction<T>;
 export type TriggerSmartContract = import("tronweb").TriggerSmartContract;
 export type TronTransactionReceipt = import("tronweb").TransactionInfo;
-export type TransactionResult = import("@wdk/wallet").TransactionResult;
-export type TransferOptions = import("@wdk/wallet").TransferOptions;
-export type TransferResult = import("@wdk/wallet").TransferResult;
+export type TransactionResult = import("@tetherto/wdk-wallet").TransactionResult;
+export type TransferOptions = import("@tetherto/wdk-wallet").TransferOptions;
+export type TransferResult = import("@tetherto/wdk-wallet").TransferResult;
 export type TronTransaction = {
     /**
      * - The transaction's recipient.
@@ -89,5 +89,5 @@ export type TronWalletConfig = {
      */
     transferMaxFee?: number | bigint;
 };
-import { WalletAccountReadOnly } from '@wdk/wallet';
+import { WalletAccountReadOnly } from '@tetherto/wdk-wallet';
 import TronWeb from 'tronweb'
