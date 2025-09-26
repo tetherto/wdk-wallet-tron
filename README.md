@@ -1,4 +1,4 @@
-# @wdk/wallet-tron
+# @tetherto/wdk-wallet-tron
 
 **Note**: This package is currently in beta. Please test thoroughly in development environments before using in production.
 
@@ -19,22 +19,22 @@ For detailed documentation about the complete WDK ecosystem, visit [docs.wallet.
 
 ## ⬇️ Installation
 
-To install the `@wdk/wallet-tron` package, follow these instructions:
+To install the `@tetherto/wdk-wallet-tron` package, follow these instructions:
 
 You can install it using npm:
 
 ```bash
-npm install @wdk/wallet-tron
+npm install @tetherto/wdk-wallet-tron
 ```
 
 ## 🚀 Quick Start
 
-### Importing from `@wdk/wallet-tron`
+### Importing from `@tetherto/wdk-wallet-tron`
 
 ### Creating a New Wallet
 
 ```javascript
-import WalletManagerTron, { WalletAccountTron, WalletAccountReadOnlyTron } from '@wdk/wallet-tron'
+import WalletManagerTron, { WalletAccountTron, WalletAccountReadOnlyTron } from '@tetherto/wdk-wallet-tron'
 
 // Use a BIP-39 seed phrase (replace with your own secure phrase)
 const seedPhrase = 'test only example nut use this real life secret phrase must random'
@@ -55,7 +55,7 @@ const readOnlyAccount = await account.toReadOnlyAccount()
 ### Managing Multiple Accounts
 
 ```javascript
-import WalletManagerTron from '@wdk/wallet-tron'
+import WalletManagerTron from '@tetherto/wdk-wallet-tron'
 
 // Assume wallet is already created
 // Get the first account (index 0)
@@ -85,7 +85,7 @@ console.log('Custom account address:', customAddress)
 For accounts where you have the seed phrase and full access:
 
 ```javascript
-import WalletManagerTron from '@wdk/wallet-tron'
+import WalletManagerTron from '@tetherto/wdk-wallet-tron'
 
 // Assume wallet and account are already created
 // Get native TRX balance (in sun)
@@ -106,7 +106,7 @@ console.log('TRC20 token balance:', tokenBalance);
 For addresses where you don't have the seed phrase:
 
 ```javascript
-import { WalletAccountReadOnlyTron } from '@wdk/wallet-tron'
+import { WalletAccountReadOnlyTron } from '@tetherto/wdk-wallet-tron'
 
 // Create a read-only account
 const readOnlyAccount = new WalletAccountReadOnlyTron('T...', { // Tron address
@@ -213,14 +213,14 @@ wallet.dispose()
 
 | Class | Description | Methods |
 |-------|-------------|---------|
-| [WalletManagerTron](#walletmanagertron) | Main class for managing Tron wallets. Extends `WalletManager` from `@wdk/wallet`. | [Constructor](#constructor), [Methods](#methods) |
-| [WalletAccountTron](#walletaccounttron) | Individual Tron wallet account implementation. Extends `WalletAccountReadOnlyTron` and implements `IWalletAccount` from `@wdk/wallet`. | [Constructor](#constructor-1), [Methods](#methods-1), [Properties](#properties) |
-| [WalletAccountReadOnlyTron](#walletaccountreadonlytron) | Read-only Tron wallet account. Extends `WalletAccountReadOnly` from `@wdk/wallet`. | [Constructor](#constructor-2), [Methods](#methods-2) |
+| [WalletManagerTron](#walletmanagertron) | Main class for managing Tron wallets. Extends `WalletManager` from `@tetherto/wdk-wallet`. | [Constructor](#constructor), [Methods](#methods) |
+| [WalletAccountTron](#walletaccounttron) | Individual Tron wallet account implementation. Extends `WalletAccountReadOnlyTron` and implements `IWalletAccount` from `@tetherto/wdk-wallet`. | [Constructor](#constructor-1), [Methods](#methods-1), [Properties](#properties) |
+| [WalletAccountReadOnlyTron](#walletaccountreadonlytron) | Read-only Tron wallet account. Extends `WalletAccountReadOnly` from `@tetherto/wdk-wallet`. | [Constructor](#constructor-2), [Methods](#methods-2) |
 
 ### WalletManagerTron
 
 The main class for managing Tron wallets.  
-Extends `WalletManager` from `@wdk/wallet`.
+Extends `WalletManager` from `@tetherto/wdk-wallet`.
 
 #### Constructor
 
@@ -314,7 +314,7 @@ wallet.dispose()
 
 ### WalletAccountTron
 
-Represents an individual wallet account. Implements `IWalletAccount` from `@wdk/wallet`.
+Represents an individual wallet account. Implements `IWalletAccount` from `@tetherto/wdk-wallet`.
 
 #### Constructor
 
