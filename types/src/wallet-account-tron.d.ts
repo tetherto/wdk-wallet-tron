@@ -84,11 +84,11 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron impleme
     /** @private */
     private _signTransaction;
 }
-export type IWalletAccount = import("@wdk/wallet").IWalletAccount;
-export type KeyPair = import("@wdk/wallet").KeyPair;
-export type TransactionResult = import("@wdk/wallet").TransactionResult;
-export type TransferOptions = import("@wdk/wallet").TransferOptions;
-export type TransferResult = import("@wdk/wallet").TransferResult;
+export type IWalletAccount = import("@tetherto/wdk-wallet").IWalletAccount;
+export type KeyPair = import("@tetherto/wdk-wallet").KeyPair;
+export type TransactionResult = import("@tetherto/wdk-wallet").TransactionResult;
+export type TransferOptions = import("@tetherto/wdk-wallet").TransferOptions;
+export type TransferResult = import("@tetherto/wdk-wallet").TransferResult;
 export type TronTransaction = import("./wallet-account-read-only-tron.js").TronTransaction;
 export type TronWalletConfig = import("./wallet-account-read-only-tron.js").TronWalletConfig;
 import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js';

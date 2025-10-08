@@ -1,8 +1,13 @@
 {
-  "name": "@wdk/wallet-tron",
+  "name": "@tetherto/wdk-wallet-tron",
   "version": "1.0.0-beta.1",
   "description": "A simple package to manage BIP-32 wallets for the tron blockchain.",
-  "keywords": ["wdk", "wallet", "bip-32", "tron"],
+  "keywords": [
+    "wdk",
+    "wallet",
+    "bip-32",
+    "tron"
+  ],
   "author": "Tether",
   "license": "Apache-2.0",
   "repository": {
@@ -22,7 +27,7 @@
     "@noble/hashes": "1.3.3",
     "@noble/secp256k1": "2.2.3",
     "@scure/bip32": "1.7.0",
-    "@wdk/wallet": "https://github.com/davi0kprogramsthings/wdk-wallet.git#develop",
+    "@tetherto/wdk-wallet": "^1.0.0-beta.1",
     "bare-node-runtime": "1.0.3",
     "bip39": "3.1.0",
     "sodium-universal": "5.0.1",
@@ -43,6 +48,10 @@
     "./package": {
       "default": "./package.json"
     }
+  },
+  "publishConfig": {
+    "access": "restricted",
+    "registry": "https://registry.npmjs.org/"
   },
   "standard": {
     "ignore": [
