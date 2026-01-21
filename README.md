@@ -370,7 +370,7 @@ console.log('Signature:', signature)
 ```
 
 ##### `verify(message, signature)`
-Verifies a message signature using TronWeb's `verifyMessageV2` API.
+Verifies a message signature using the account's public key.
 
 **Parameters:**
 - `message` (string): Original message
