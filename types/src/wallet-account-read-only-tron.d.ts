@@ -21,6 +21,14 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      */
     protected _tronWeb: TronWeb | undefined;
     /**
+     * Verifies a message's signature.
+     *
+     * @param {string} message - The original message.
+     * @param {string} signature - The signature to verify (hex-encoded).
+     * @returns {Promise<boolean>} True if the signature is valid.
+     */
+    verify(message: string, signature: string): Promise<boolean>;
+    /**
      * Returns the account's tronix balance.
      *
      * @returns {Promise<bigint>} The tronix balance (in suns).
