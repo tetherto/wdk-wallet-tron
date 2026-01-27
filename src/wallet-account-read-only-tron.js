@@ -18,6 +18,8 @@ import { WalletAccountReadOnly } from '@tetherto/wdk-wallet'
 
 import TronWeb from 'tronweb'
 
+import FailoverProvider from 'wdk-failover-provider'
+
 /** @typedef {import('tronweb').Transaction} Transaction */
 /** @typedef {import('tronweb').TriggerSmartContract} TriggerSmartContract */
 /** @typedef {import('tronweb').TransactionInfo} TronTransactionReceipt */
@@ -35,6 +37,7 @@ import TronWeb from 'tronweb'
 /**
  * @typedef {Object} TronWalletConfig
  * @property {string | TronWeb} [provider] - The url of the tron web provider, or an instance of the {@link TronWeb} class.
+ * @property {number} [retries] - The number of retries in the failover mechanism.
  * @property {number | bigint} [transferMaxFee] - The maximum fee amount for transfer operations.
  */
 
@@ -47,7 +50,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    * @param {string} address - The account's address.
    * @param {Omit<TronWalletConfig, 'transferMaxFee'>} [config] - The configuration object.
    */
-  constructor (address, config = { }) {
+  constructor (address, config = {}) {
     super(address)
 
     /**
@@ -58,18 +61,39 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      */
     this._config = config
 
-    const { provider } = config
+    /**
+     * The tron web client.
+     *
+     * @protected
+     * @type {TronWeb | undefined}
+     */
+    this._tronWeb = undefined
 
-    if (provider) {
-      /**
-       * The tron web client.
-       *
-       * @protected
-       * @type {TronWeb | undefined}
-       */
-      this._tronWeb = typeof provider === 'string'
-        ? new TronWeb({ fullHost: provider })
-        : provider
+    const { provider, retries = 3 } = config
+
+    if (Array.isArray(provider)) {
+      this._tronWeb = provider
+        .reduce(
+          /**
+           * @param {FailoverProvider<TronWeb>} failover
+           * @param {string | TronWeb} provider
+           */
+          (failover, provider) =>
+            failover.addProvider(
+              typeof provider === 'string'
+                ? new TronWeb({ fullHost: provider })
+                : provider
+            ),
+          new FailoverProvider({ retries })
+        )
+        .initialize()
+    } else if (provider) {
+      this._tronWeb =
+        typeof provider === 'string'
+          ? new TronWeb({ fullHost: provider })
+          : provider
+    } else {
+      this._tronWeb = undefined
     }
   }
 
@@ -80,7 +104,9 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    */
   async getBalance () {
     if (!this._tronWeb) {
-      throw new Error('The wallet must be connected to tron web to retrieve balances.')
+      throw new Error(
+        'The wallet must be connected to tron web to retrieve balances.'
+      )
     }
 
     const address = await this.getAddress()
@@ -98,15 +124,23 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    */
   async getTokenBalance (tokenAddress) {
     if (!this._tronWeb) {
-      throw new Error('The wallet must be connected to tron web to retrieve token balances.')
+      throw new Error(
+        'The wallet must be connected to tron web to retrieve token balances.'
+      )
     }
 
     const address = await this.getAddress()
     const addressHex = this._tronWeb.address.toHex(address)
     const parameters = [{ type: 'address', value: addressHex }]
 
-    const result = await this._tronWeb.transactionBuilder
-      .triggerConstantContract(tokenAddress, 'balanceOf(address)', {}, parameters, addressHex)
+    const result =
+      await this._tronWeb.transactionBuilder.triggerConstantContract(
+        tokenAddress,
+        'balanceOf(address)',
+        {},
+        parameters,
+        addressHex
+      )
 
     const balance = this._tronWeb.toBigNumber('0x' + result.constant_result[0])
 
@@ -121,12 +155,18 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    */
   async quoteSendTransaction ({ to, value }) {
     if (!this._tronWeb) {
-      throw new Error('The wallet must be connected to tron web to quote transactions.')
+      throw new Error(
+        'The wallet must be connected to tron web to quote transactions.'
+      )
     }
 
     const address = await this.getAddress()
 
-    const transaction = await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
+    const transaction = await this._tronWeb.transactionBuilder.sendTrx(
+      to,
+      value,
+      address
+    )
     const fee = await this._getBandwidthCost(transaction)
 
     return { fee: BigInt(fee) }
@@ -140,7 +180,9 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    */
   async quoteTransfer ({ token, recipient, amount }) {
     if (!this._tronWeb) {
-      throw new Error('The wallet must be connected to tron web to quote transfer operations.')
+      throw new Error(
+        'The wallet must be connected to tron web to quote transfer operations.'
+      )
     }
 
     const address = await this.getAddress()
@@ -152,17 +194,25 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     ]
 
     // eslint-disable-next-line camelcase
-    const { transaction, energy_used } = await this._tronWeb.transactionBuilder
-      .triggerConstantContract(token, 'transfer(address,uint256)', {}, parameters, addressHex)
+    const { transaction, energy_used } =
+      await this._tronWeb.transactionBuilder.triggerConstantContract(
+        token,
+        'transfer(address,uint256)',
+        {},
+        parameters,
+        addressHex
+      )
 
     const chainParameters = await this._tronWeb.trx.getChainParameters()
     const { value } = chainParameters.find(({ key }) => key === 'getEnergyFee')
 
     const resources = await this._tronWeb.trx.getAccountResources(address)
-    const availableEnergy = (resources.EnergyLimit || 0) - (resources.EnergyUsed || 0)
+    const availableEnergy =
+      (resources.EnergyLimit || 0) - (resources.EnergyUsed || 0)
 
     // eslint-disable-next-line camelcase
-    const energyCost = availableEnergy < energy_used ? Math.ceil(energy_used * value) : 0
+    const energyCost =
+      availableEnergy < energy_used ? Math.ceil(energy_used * value) : 0
 
     const bandwidthCost = await this._getBandwidthCost(transaction)
 
@@ -179,7 +229,9 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    */
   async getTransactionReceipt (hash) {
     if (!this._tronWeb) {
-      throw new Error('The wallet must be connected to tron web to fetch transaction receipts.')
+      throw new Error(
+        'The wallet must be connected to tron web to fetch transaction receipts.'
+      )
     }
 
     const receipt = await this._tronWeb.trx.getTransactionInfo(hash)
@@ -205,8 +257,10 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
 
     const resources = await this._tronWeb.trx.getAccountResources(address)
 
-    const freeBandwidthLeft = (resources.freeNetLimit || 0) - (resources.freeNetUsed || 0)
-    const frozenBandwidthLeft = (resources.NetLimit || 0) - (resources.NetUsed || 0)
+    const freeBandwidthLeft =
+      (resources.freeNetLimit || 0) - (resources.freeNetUsed || 0)
+    const frozenBandwidthLeft =
+      (resources.NetLimit || 0) - (resources.NetUsed || 0)
     const totalAvailableBandwidth = freeBandwidthLeft + frozenBandwidthLeft
 
     const missingBandwidth = rawDataHex.length - totalAvailableBandwidth
