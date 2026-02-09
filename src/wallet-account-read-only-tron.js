@@ -20,7 +20,6 @@ import _TronWeb from 'tronweb'
 
 const { TronWeb } = _TronWeb
 
-
 /** @typedef {import('tronweb').Transaction} Transaction */
 /** @typedef {import('tronweb').TriggerSmartContract} TriggerSmartContract */
 /** @typedef {import('tronweb').TransactionInfo} TronTransactionReceipt */
