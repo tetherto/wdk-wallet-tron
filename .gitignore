@@ -1,2 +1,13 @@
 node_modules
 coverage
+
+# Hardhat / hardhat-tron build output (generated, not committed)
+/artifacts/
+/cache/
+/cache_hardhat-tron/
+**/artifacts-tron/
+**/cache-tron/
+
+# Docker Tron node data
+datadir/
+logs/

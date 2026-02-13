@@ -1,0 +1,36 @@
+# Local Tron private network for integration testing.
+#
+# Uses the official tronprotocol/java-tron image running a single
+# witness node that produces blocks every 3 seconds.
+#
+# Genesis account (pre-funded with ~95 000 000 000 TRX):
+#   Address:     TPL66VK2gCXNCD7EJg9pgJRfqcRazjhUZY
+#   Private key: da146374a75310b9666e834ee4ad0866d6f4035967bfc76217c5a495fff9f0d0
+#
+# Start:  docker compose up -d
+# Stop:   docker compose down
+# Logs:   docker compose logs -f tron-node
+
+services:
+  tron-node:
+    image: tronprotocol/java-tron:latest
+    ports:
+      - '8090:8090'
+      - '8091:8091'
+      - '50051:50051'
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    volumes:
+      - ./conf:/java-tron/conf
+    command: >
+      -jvm "{-Xmx4g -Xmn1g}"
+      -c /java-tron/conf/private_net_config.conf
+      -w
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -sf -X POST http://localhost:8090/wallet/getnowblock -H "Content-Type: application/json" -d "{}" || exit 1']
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 30s

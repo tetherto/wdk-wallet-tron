@@ -647,11 +647,28 @@ npm run lint:fix
 ### Testing
 
 ```bash
-# Run tests
+# Run unit tests
 npm test
 
-# Run tests with coverage
+# Run unit tests with coverage
 npm run test:coverage
+```
+
+### Integration Testing
+
+Integration tests run against a local Tron private network in Docker. They exercise full end-to-end flows: account derivation, TRX transfers, TRC20 token transfers, fee quoting, message signing, read-only accounts, disposal, and fee limits.
+
+**Prerequisites:** Docker must be installed and running.
+
+```bash
+# Start the local Tron node
+npm run test:integration:docker:up
+
+# Run integration tests
+npm run test:integration
+
+# Stop the local Tron node
+npm run test:integration:docker:down
 ```
 
 ## 📜 License
