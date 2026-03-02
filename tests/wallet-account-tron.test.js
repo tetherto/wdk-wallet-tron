@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals'
 import * as bip39 from 'bip39'
 
-import { TronWeb } from 'tronweb'
+import { TronWeb, Trx } from 'tronweb'
 
 const SEED_PHRASE = 'cook voyage document eight skate token alien guide drink uncle term abuse'
 const INVALID_SEED_PHRASE = 'invalid seed phrase'
@@ -48,8 +48,8 @@ jest.unstable_mockModule('tronweb', () => {
   Object.defineProperties(TronWebMock, Object.getOwnPropertyDescriptors(TronWeb))
 
   return {
-    default: TronWebMock,
-    TronWeb: TronWebMock
+    TronWeb: TronWebMock,
+    Trx
   }
 })
 
