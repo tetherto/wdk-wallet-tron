@@ -33,7 +33,7 @@
     "bare-node-runtime": "^1.1.4",
     "bip39": "3.1.0",
     "sodium-universal": "5.0.1",
-    "tronweb": "5.3.4"
+    "tronweb": "6.2.0"
   },
   "devDependencies": {
     "cross-env": "7.0.3",

@@ -16,7 +16,7 @@
 
 import WalletManager from '@tetherto/wdk-wallet'
 
-import TronWeb from 'tronweb'
+import { TronWeb } from 'tronweb'
 
 import WalletAccountTron from './wallet-account-tron.js'
 

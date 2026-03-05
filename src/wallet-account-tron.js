@@ -14,7 +14,7 @@
 
 'use strict'
 
-import TronWeb from 'tronweb'
+import { TronWeb } from 'tronweb'
 
 // eslint-disable-next-line camelcase
 import { keccak_256 } from '@noble/hashes/sha3'

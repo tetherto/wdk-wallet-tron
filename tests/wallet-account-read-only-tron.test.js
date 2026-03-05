@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals'
 
-import TronWeb from 'tronweb'
+import { TronWeb, Trx } from 'tronweb'
 
 const ADDRESS = 'TXngH8bVadn9ZWtKBgjKQcqN1GsZ7A1jcb'
 
@@ -35,7 +35,8 @@ jest.unstable_mockModule('tronweb', () => {
   Object.defineProperties(TronWebMock, Object.getOwnPropertyDescriptors(TronWeb))
 
   return {
-    default: TronWebMock
+    TronWeb: TronWebMock,
+    Trx
   }
 })
 
