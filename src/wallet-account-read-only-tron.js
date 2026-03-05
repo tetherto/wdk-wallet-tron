@@ -85,7 +85,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
 
     const recoveredAddress = await Trx.verifyMessageV2(message, signature)
 
-    return address.toLowerCase() === recoveredAddress.toLowerCase()
+    return address === recoveredAddress
   }
 
   /**

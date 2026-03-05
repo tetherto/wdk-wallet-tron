@@ -69,6 +69,14 @@ describe('WalletAccountReadOnlyTron', () => {
       expect(result).toBe(false)
     })
 
+    test('should return false for an address with invalid casing', async () => {
+      const lowercasedAddressAccount = new WalletAccountReadOnlyTron(ADDRESS.toLowerCase())
+
+      const result = await lowercasedAddressAccount.verify(MESSAGE, SIGNATURE)
+
+      expect(result).toBe(false)
+    })
+
     test('should throw on a malformed signature', async () => {
       await expect(account.verify(MESSAGE, '0xinvalid'))
         .rejects.toThrow(/invalid BytesLike value/)
