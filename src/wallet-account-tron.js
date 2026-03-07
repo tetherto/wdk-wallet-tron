@@ -11,24 +11,12 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 'use strict'
 
-import { TronWeb } from 'tronweb'
-
-// eslint-disable-next-line camelcase
-import { keccak_256 } from '@noble/hashes/sha3'
-import { secp256k1 } from '@noble/curves/secp256k1'
-import { HDKey } from '@scure/bip32'
-import * as bip39 from 'bip39'
-
-// eslint-disable-next-line camelcase
-import { sodium_memzero } from 'sodium-universal'
-
+import SeedSignerTron from './signers/seed-signer-tron.js'
 import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js'
 
 /** @typedef {import('@tetherto/wdk-wallet').IWalletAccount} IWalletAccount */
-
 /** @typedef {import('@tetherto/wdk-wallet').KeyPair} KeyPair */
 /** @typedef {import('@tetherto/wdk-wallet').TransactionResult} TransactionResult */
 /** @typedef {import('@tetherto/wdk-wallet').TransferOptions} TransferOptions */
@@ -37,122 +25,80 @@ import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js'
 /** @typedef {import('./wallet-account-read-only-tron.js').TronTransaction} TronTransaction */
 /** @typedef {import('./wallet-account-read-only-tron.js').TronWalletConfig} TronWalletConfig */
 
-const BIP_44_TRON_DERIVATION_PATH_PREFIX = "m/44'/195'"
-
-function getTronAddress (publicKey) {
-  const uncompressedPublicKey = secp256k1.Point.fromHex(publicKey)
-    .toRawBytes(false)
-    .slice(1)
-
-  const publicKeyHash = keccak_256(uncompressedPublicKey)
-  const addressBytes = publicKeyHash.slice(12)
-  const addressHex = '41' + Buffer.from(addressBytes).toString('hex')
-
-  const address = TronWeb.address.fromHex(addressHex)
-
-  return address
-}
-
 /** @implements {IWalletAccount} */
 export default class WalletAccountTron extends WalletAccountReadOnlyTron {
   /**
-   * Creates a new tron wallet account.
+   * Creates a new TRON wallet account using a child signer.
    *
-   * @param {string | Uint8Array} seed - The wallet's [BIP-39](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki) seed phrase.
-   * @param {string} path - The BIP-44 derivation path (e.g. "0'/0/0").
-   * @param {TronWalletConfig} [config] - The configuration object.
+   * @param {import('./signers/interface.js').ISignerTron} signer - A child signer (not root).
+   * @param {TronWalletConfig} [config]
    */
-  constructor (seed, path, config = { }) {
-    if (typeof seed === 'string') {
-      if (!bip39.validateMnemonic(seed)) {
-        throw new Error('The seed phrase is invalid.')
-      }
-
-      seed = bip39.mnemonicToSeedSync(seed)
+  constructor (signer, config = {}) {
+    if (!signer) {
+      throw new Error('A signer is required.')
+    }
+    if (signer.isRoot) {
+      throw new Error('The signer is the root signer. Call derive() to create a child signer.')
     }
 
-    path = BIP_44_TRON_DERIVATION_PATH_PREFIX + '/' + path
+    super(signer.address, config)
 
-    const account = HDKey.fromMasterSeed(seed).derive(path)
-
-    const address = getTronAddress(account.publicKey)
-
-    super(address, config)
-
-    /**
-     * The tron wallet account configuration.
-     *
-     * @protected
-     * @type {TronWalletConfig}
-     */
+    /** @protected */
     this._config = config
-
     /** @private */
-    this._path = path
-
-    /**
-     * The account's hd key.
-     *
-     * @protected
-     * @type {HDKey}
-     */
-    this._account = account
+    this._signer = signer
+    this._isActive = true
   }
 
+  get isActive () { return this._isActive }
+
   /**
-   * The derivation path's index of this account.
-   *
+   * The derivation path index of this account.
    * @type {number}
    */
-  get index () {
-    return +this._path.split('/').pop()
-  }
+  get index () { return this._signer.index }
 
   /**
-   * The derivation path of this account (see [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki)).
-   *
+   * The full BIP-44 derivation path.
    * @type {string}
    */
-  get path () {
-    return this._path
-  }
+  get path () { return this._signer.path }
 
   /**
    * The account's key pair.
-   *
    * @type {KeyPair}
    */
-  get keyPair () {
-    return {
-      privateKey: this._account.privateKey,
-      publicKey: this._account.publicKey
-    }
+  get keyPair () { return this._signer.keyPair }
+
+  /**
+   * Legacy factory — creates an account from a BIP-39 seed and a relative derivation path.
+   *
+   * @param {string|Uint8Array} seed
+   * @param {string} path - Relative path, e.g. "0'/0/0"
+   * @param {TronWalletConfig} [config]
+   * @returns {WalletAccountTron}
+   */
+  static fromSeed (seed, path, config = {}) {
+    const root = new SeedSignerTron(seed)
+    const child = root.derive(path)
+    return new WalletAccountTron(child, config)
   }
 
   /**
-   * Signs a message.
+   * Signs a message using the TRON personal sign format.
    *
-   * @param {string} message - The message to sign.
-   * @returns {Promise<string>} The message's signature.
+   * @param {string} message
+   * @returns {Promise<string>} 0x-prefixed hex signature
    */
   async sign (message) {
-    const messageBytes = Buffer.from(message, 'utf8')
-    const prefix = Buffer.from(`\x19TRON Signed Message:\n${messageBytes.length}`, 'utf8')
-    const messageWithPrefixBytes = Buffer.concat([prefix, messageBytes])
-    const hash = keccak_256(messageWithPrefixBytes)
-
-    const signature = secp256k1.sign(hash, this._account.privateKey)
-    const signatureWithRecovery = new Uint8Array([...signature.toCompactRawBytes(), 27 + signature.recovery])
-    const hex = Buffer.from(signatureWithRecovery).toString('hex')
-
-    return '0x' + hex
+    return this._signer.sign(message)
   }
 
   /**
-   * Sends a transaction.
+   * Sends a TRX transaction.
    *
-   * @param {TronTransaction} tx - The transaction.
-   * @returns {Promise<TransactionResult>} The transaction's result.
+   * @param {TronTransaction} tx
+   * @returns {Promise<TransactionResult>}
    */
   async sendTransaction ({ to, value }) {
     if (!this._tronWeb) {
@@ -160,21 +106,23 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
     }
 
     const address = await this.getAddress()
-
     const transaction = await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
     const fee = await this._getBandwidthCost(transaction)
-    const signedTransaction = await this._signTransaction(transaction)
+    const signedTransaction = await this._buildSignedTransaction(transaction)
+    const broadcastResult = await this._tronWeb.trx.sendRawTransaction(signedTransaction)
 
-    const { txid } = await this._tronWeb.trx.sendRawTransaction(signedTransaction)
+    if (!broadcastResult.result) {
+      throw new Error(`Transaction broadcast failed: ${broadcastResult.code} - ${broadcastResult.message}`)
+    }
 
-    return { hash: txid, fee: BigInt(fee) }
+    return { hash: signedTransaction.txID, fee: BigInt(fee) }
   }
 
   /**
-   * Transfers a token to another address.
+   * Transfers a TRC-20 token.
    *
-   * @param {TransferOptions} options - The transfer's options.
-   * @returns {Promise<TransferResult>} The transfer's result.
+   * @param {TransferOptions} options
+   * @returns {Promise<TransferResult>}
    */
   async transfer ({ token, recipient, amount }) {
     if (!this._tronWeb) {
@@ -190,11 +138,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
     const address = await this.getAddress()
     const addressHex = this._tronWeb.address.toHex(address)
 
-    const options = {
-      feeLimit: Number(fee),
-      callValue: 0
-    }
-
+    const options = { feeLimit: Number(fee), callValue: 0 }
     const parameters = [
       { type: 'address', value: this._tronWeb.address.toHex(recipient) },
       { type: 'uint256', value: amount }
@@ -203,52 +147,36 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
     const { transaction } = await this._tronWeb.transactionBuilder
       .triggerSmartContract(token, 'transfer(address,uint256)', options, parameters, addressHex)
 
-    const signedTransaction = await this._signTransaction(transaction)
+    const signedTransaction = await this._buildSignedTransaction(transaction)
+    const broadcastResult = await this._tronWeb.trx.sendRawTransaction(signedTransaction)
 
-    const { txid } = await this._tronWeb.trx.sendRawTransaction(signedTransaction)
+    if (!broadcastResult.result) {
+      throw new Error(`Transaction broadcast failed: ${broadcastResult.code} - ${broadcastResult.message}`)
+    }
 
-    return { hash: txid, fee }
+    return { hash: signedTransaction.txID, fee }
   }
 
   /**
-   * Returns a read-only copy of the account.
-   *
-   * @returns {Promise<WalletAccountReadOnlyTron>} The read-only account.
+   * Returns a read-only copy of this account.
+   * @returns {Promise<WalletAccountReadOnlyTron>}
    */
   async toReadOnlyAccount () {
     const address = await this.getAddress()
-
-    const readOnlyAccount = new WalletAccountReadOnlyTron(address, this._config)
-
-    return readOnlyAccount
+    return new WalletAccountReadOnlyTron(address, this._config)
   }
 
   /**
-   * Disposes the wallet account, erasing the private key from the memory.
+   * Disposes the account and clears private key from memory.
    */
   dispose () {
-    sodium_memzero(this._account.privKeyBytes)
-
-    this._account.privKeyBytes = undefined
-
-    this._account.privKey = undefined
+    this._signer.dispose()
+    this._isActive = false
   }
 
   /** @private */
-  async _signTransaction (transaction) {
-    const transactionBytes = Buffer.from(transaction.txID, 'hex')
-
-    const signature = secp256k1.sign(transactionBytes, this._account.privateKey, { lowS: true })
-
-    const r = signature.r.toString(16).padStart(64, '0')
-    const s = signature.s.toString(16).padStart(64, '0')
-    const v = signature.recovery.toString(16).padStart(2, '0')
-
-    const serializedSignature = r + s + v
-
-    return {
-      ...transaction,
-      signature: [serializedSignature]
-    }
+  async _buildSignedTransaction (transaction) {
+    const signature = await this._signer.signTransaction(transaction.txID)
+    return { ...transaction, signature: [signature] }
   }
 }

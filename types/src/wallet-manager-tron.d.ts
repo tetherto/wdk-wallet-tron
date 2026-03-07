@@ -1,68 +1,45 @@
+/** @typedef {import('./wallet-account-read-only-tron.js').TronWalletConfig} TronWalletConfig */
+/** @typedef {import('@tetherto/wdk-wallet').FeeRates} FeeRates */
 export default class WalletManagerTron extends WalletManager {
-    /**
-     * Multiplier for normal fee rate calculations (in %).
-     *
-     * @protected
-     * @type {bigint}
-     */
+    /** @protected @type {bigint} */
     protected static _FEE_RATE_NORMAL_MULTIPLIER: bigint;
-    /**
-     * Multiplier for fast fee rate calculations (in %).
-     *
-     * @protected
-     * @type {bigint}
-     */
+    /** @protected @type {bigint} */
     protected static _FEE_RATE_FAST_MULTIPLIER: bigint;
     /**
-     * Creates a new wallet manager for the tron blockchain.
+     * Creates a new TRON wallet manager.
      *
-     * @param {string | Uint8Array} seed - The wallet's BIP-39 seed phrase.
-     * @param {TronWalletConfig} [config] - The configuration object.
+     * @param {import('./signers/interface.js').ISignerTron} signer - Root signer.
+     * @param {TronWalletConfig} [config]
      */
-    constructor(seed: string | Uint8Array, config?: TronWalletConfig);
+    constructor(signer: any, config?: TronWalletConfig);
+    /** @protected @type {import('tronweb').TronWeb|undefined} */
+    protected _tronWeb: import("tronweb").TronWeb | undefined;
     /**
-     * The tron wallet configuration.
-     *
-     * @protected
-     * @type {TronWalletConfig}
-     */
-    protected _config: TronWalletConfig;
-    /**
-     * The tron web client.
-     *
-     * @protected
-     * @type {TronWeb | undefined}
-     */
-    protected _tronWeb: TronWeb | undefined;
-    /**
-     * Returns the wallet account at a specific index (see [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki)).
+     * Returns the wallet account at a specific index.
      *
      * @example
-     * // Returns the account with derivation path m/44'/195'/0'/0/1
-     * const account = await wallet.getAccount(1);
-     * @param {number} [index] - The index of the account to get (default: 0).
-     * @returns {Promise<WalletAccountTron>} The account.
+     * // Returns the account at m/44'/195'/0'/0/1
+     * const account = await wallet.getAccount(1)
+     *
+     * @param {number} [index=0]
+     * @param {string} [signerName='default']
+     * @returns {Promise<WalletAccountTron>}
      */
-    getAccount(index?: number): Promise<WalletAccountTron>;
+    getAccount(index?: number, signerName?: string): Promise<WalletAccountTron>;
     /**
      * Returns the wallet account at a specific BIP-44 derivation path.
      *
      * @example
-     * // Returns the account with derivation path m/44'/195'/0'/0/1
-     * const account = await wallet.getAccountByPath("0'/0/1");
-     * @param {string} path - The derivation path (e.g. "0'/0/0").
-     * @returns {Promise<WalletAccountTron>} The account.
-     */
-    getAccountByPath(path: string): Promise<WalletAccountTron>;
-    /**
-     * Returns the current fee rates.
+     * // Returns the account at m/44'/195'/0'/0/1
+     * const account = await wallet.getAccountByPath("0'/0/1")
      *
-     * @returns {Promise<FeeRates>} The fee rates.
+     * @param {string} path - Relative path, e.g. "0'/0/0"
+     * @param {string} [signerName='default']
+     * @returns {Promise<WalletAccountTron>}
      */
-    getFeeRates(): Promise<FeeRates>;
+    getAccountByPath(path: string, signerName?: string): Promise<WalletAccountTron>;
 }
+export type TronWalletConfig = import("./wallet-account-read-only-tron.js").TronWalletConfig;
 export type FeeRates = import("@tetherto/wdk-wallet").FeeRates;
-export type TronWalletConfig = import("./wallet-account-tron.js").TronWalletConfig;
-import WalletAccountTron from './wallet-account-tron.js';
 import WalletManager from '@tetherto/wdk-wallet';
-import TronWeb from 'tronweb'
+import WalletAccountTron from './wallet-account-tron.js';

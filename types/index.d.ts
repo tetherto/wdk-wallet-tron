@@ -1,6 +1,5 @@
-export { default } from "./src/wallet-manager-tron.js";
+export { default as WalletManagerTron } from "./src/wallet-manager-tron.js";
 export { default as WalletAccountReadOnlyTron } from "./src/wallet-account-read-only-tron.js";
-export { default as WalletAccountTron } from "./src/wallet-account-tron.js";
 export type TronTransactionReceipt = import("tronweb").TransactionInfo;
 export type FeeRates = import("@tetherto/wdk-wallet").FeeRates;
 export type KeyPair = import("@tetherto/wdk-wallet").KeyPair;
@@ -9,3 +8,4 @@ export type TransferOptions = import("@tetherto/wdk-wallet").TransferOptions;
 export type TransferResult = import("@tetherto/wdk-wallet").TransferResult;
 export type TronTransaction = import("./src/wallet-account-read-only-tron.js").TronTransaction;
 export type TronWalletConfig = import("./src/wallet-account-read-only-tron.js").TronWalletConfig;
+export { default, default as WalletAccountTron } from "./src/wallet-account-tron.js";

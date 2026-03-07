@@ -2,16 +2,14 @@ import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globa
 
 import { TronWeb, Trx } from 'tronweb'
 
-const SEED_PHRASE = 'cook voyage document eight skate token alien guide drink uncle term abuse'
-
-const getChainParametersMock = jest.fn()
-
 jest.unstable_mockModule('tronweb', () => {
-  const TronWebMock = jest.fn().mockReturnValue({
+  const TronWebMock = jest.fn().mockImplementation(() => ({
     trx: {
-      getChainParameters: getChainParametersMock
+      getChainParameters: jest.fn().mockResolvedValue([
+        { key: 'getTransactionFee', value: 1000 }
+      ])
     }
-  })
+  }))
 
   // Assigns static properties of the 'TronWeb' class to the mock constructor:
   Object.defineProperties(TronWebMock, Object.getOwnPropertyDescriptors(TronWeb))
@@ -22,78 +20,98 @@ jest.unstable_mockModule('tronweb', () => {
   }
 })
 
-const { default: WalletManagerTron, WalletAccountTron } = await import('../index.js')
+const { default: WalletManagerTron } = await import('../src/wallet-manager-tron.js')
+const { default: WalletAccountTron } = await import('../src/wallet-account-tron.js')
+const { default: SeedSignerTron } = await import('../src/signers/seed-signer-tron.js')
+
+const MNEMONIC = 'cook voyage document eight skate token alien guide drink uncle term abuse'
 
 describe('WalletManagerTron', () => {
-  let wallet
+  let root, wallet
 
   beforeEach(() => {
-    wallet = new WalletManagerTron(SEED_PHRASE, {
-      provider: 'https://tron.web.provider/'
-    })
+    root = new SeedSignerTron(MNEMONIC)
+    wallet = new WalletManagerTron(root, { provider: 'https://api.trongrid.io' })
   })
 
   afterEach(() => {
     wallet.dispose()
   })
 
-  describe('getAccount', () => {
-    test('should return the account at index 0 by default', async () => {
+  describe('getAccount()', () => {
+    test('returns WalletAccountTron at index 0 by default', async () => {
       const account = await wallet.getAccount()
-
       expect(account).toBeInstanceOf(WalletAccountTron)
+    })
 
+    test('account at index 0 has correct path', async () => {
+      const account = await wallet.getAccount()
       expect(account.path).toBe("m/44'/195'/0'/0/0")
     })
 
-    test('should return the account at the given index', async () => {
+    test('account at index 3 has correct path', async () => {
       const account = await wallet.getAccount(3)
-
-      expect(account).toBeInstanceOf(WalletAccountTron)
-
       expect(account.path).toBe("m/44'/195'/0'/0/3")
     })
 
-    test('should throw if the index is a negative number', async () => {
-      await expect(wallet.getAccount(-1))
-        .rejects.toThrow('invalid child index')
+    test('returns same cached instance on second call', async () => {
+      const a1 = await wallet.getAccount(0)
+      const a2 = await wallet.getAccount(0)
+      expect(a1).toBe(a2)
     })
   })
 
-  describe('getAccountByPath', () => {
-    test('should return the account with the given path', async () => {
+  describe('getAccountByPath()', () => {
+    test('returns account with given path', async () => {
       const account = await wallet.getAccountByPath("1'/2/3")
-
-      expect(account).toBeInstanceOf(WalletAccountTron)
-
       expect(account.path).toBe("m/44'/195'/1'/2/3")
     })
 
-    test('should throw if the path is invalid', async () => {
-      await expect(wallet.getAccountByPath("a'/b/c"))
-        .rejects.toThrow('invalid child index')
+    test('throws if signer name not found', async () => {
+      await expect(wallet.getAccountByPath("0'/0/0", 'nonexistent'))
+        .rejects.toThrow('nonexistent')
+    })
+
+    test('caches by signerName:path key', async () => {
+      const a1 = await wallet.getAccountByPath("0'/0/0")
+      const a2 = await wallet.getAccountByPath("0'/0/0")
+      expect(a1).toBe(a2)
     })
   })
 
-  describe('getFeeRates', () => {
-    test('should return the correct fee rates', async () => {
-      const DUMMY_CHAIN_PARAMETERS = [
-        { key: 'getTransactionFee', value: 1_000 }
-      ]
-
-      getChainParametersMock.mockResolvedValue(DUMMY_CHAIN_PARAMETERS)
-
-      const feeRates = await wallet.getFeeRates()
-
-      expect(getChainParametersMock).toHaveBeenCalled()
-      expect(feeRates.normal).toBe(1_100n)
-      expect(feeRates.fast).toBe(2_000n)
+  describe('getFeeRates()', () => {
+    test('returns normal and fast fee rates as bigints', async () => {
+      const rates = await wallet.getFeeRates()
+      expect(typeof rates.normal).toBe('bigint')
+      expect(typeof rates.fast).toBe('bigint')
+      expect(rates.fast > rates.normal).toBe(true)
     })
 
-    test('should throw if the wallet is not connected to tron web', async () => {
-      const disconnectedWallet = new WalletManagerTron(SEED_PHRASE)
-      await expect(disconnectedWallet.getFeeRates())
-        .rejects.toThrow('The wallet must be connected to tron web to get fee rates.')
+    test('normal is 110% of base fee', async () => {
+      const rates = await wallet.getFeeRates()
+      // base fee = 1000, normal = 1000 * 110 / 100 = 1100n
+      expect(rates.normal).toBe(1100n)
+    })
+
+    test('fast is 200% of base fee', async () => {
+      const rates = await wallet.getFeeRates()
+      expect(rates.fast).toBe(2000n)
+    })
+
+    test('throws if not connected to a provider', async () => {
+      const offline = new WalletManagerTron(root)
+      await expect(offline.getFeeRates()).rejects.toThrow('connected to tron web')
+    })
+  })
+
+  describe('static methods', () => {
+    test('getRandomSeedPhrase returns a valid mnemonic', () => {
+      const phrase = WalletManagerTron.getRandomSeedPhrase()
+      expect(WalletManagerTron.isValidSeedPhrase(phrase)).toBe(true)
+    })
+
+    test('isValidSeedPhrase returns false for invalid phrase', () => {
+      expect(WalletManagerTron.isValidSeedPhrase('not a valid phrase')).toBe(false)
     })
   })
 })

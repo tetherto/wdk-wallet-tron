@@ -14,19 +14,15 @@
 'use strict'
 
 /** @typedef {import('tronweb').TransactionInfo} TronTransactionReceipt */
-
 /** @typedef {import('@tetherto/wdk-wallet').FeeRates} FeeRates */
-
 /** @typedef {import('@tetherto/wdk-wallet').KeyPair} KeyPair */
 /** @typedef {import('@tetherto/wdk-wallet').TransactionResult} TransactionResult */
 /** @typedef {import('@tetherto/wdk-wallet').TransferOptions} TransferOptions */
 /** @typedef {import('@tetherto/wdk-wallet').TransferResult} TransferResult */
-
 /** @typedef {import('./src/wallet-account-read-only-tron.js').TronTransaction} TronTransaction */
 /** @typedef {import('./src/wallet-account-read-only-tron.js').TronWalletConfig} TronWalletConfig */
 
-export { default } from './src/wallet-manager-tron.js'
-
-export { default as WalletAccountReadOnlyTron } from './src/wallet-account-read-only-tron.js'
-
+export { default } from './src/wallet-account-tron.js'
+export { default as WalletManagerTron } from './src/wallet-manager-tron.js'
 export { default as WalletAccountTron } from './src/wallet-account-tron.js'
+export { default as WalletAccountReadOnlyTron } from './src/wallet-account-read-only-tron.js'

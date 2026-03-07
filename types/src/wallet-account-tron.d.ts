@@ -1,80 +1,81 @@
+/** @typedef {import('@tetherto/wdk-wallet').IWalletAccount} IWalletAccount */
+/** @typedef {import('@tetherto/wdk-wallet').KeyPair} KeyPair */
+/** @typedef {import('@tetherto/wdk-wallet').TransactionResult} TransactionResult */
+/** @typedef {import('@tetherto/wdk-wallet').TransferOptions} TransferOptions */
+/** @typedef {import('@tetherto/wdk-wallet').TransferResult} TransferResult */
+/** @typedef {import('./wallet-account-read-only-tron.js').TronTransaction} TronTransaction */
+/** @typedef {import('./wallet-account-read-only-tron.js').TronWalletConfig} TronWalletConfig */
 /** @implements {IWalletAccount} */
 export default class WalletAccountTron extends WalletAccountReadOnlyTron implements IWalletAccount {
     /**
-     * Creates a new tron wallet account.
+     * Legacy factory — creates an account from a BIP-39 seed and a relative derivation path.
      *
-     * @param {string | Uint8Array} seed - The wallet's [BIP-39](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki) seed phrase.
-     * @param {string} path - The BIP-44 derivation path (e.g. "0'/0/0").
-     * @param {TronWalletConfig} [config] - The configuration object.
+     * @param {string|Uint8Array} seed
+     * @param {string} path - Relative path, e.g. "0'/0/0"
+     * @param {TronWalletConfig} [config]
+     * @returns {WalletAccountTron}
      */
-    constructor(seed: string | Uint8Array, path: string, config?: TronWalletConfig);
+    static fromSeed(seed: string | Uint8Array, path: string, config?: TronWalletConfig): WalletAccountTron;
+    /**
+     * Creates a new TRON wallet account using a child signer.
+     *
+     * @param {import('./signers/interface.js').ISignerTron} signer - A child signer (not root).
+     * @param {TronWalletConfig} [config]
+     */
+    constructor(signer: any, config?: TronWalletConfig);
+    /** @protected */
+    protected _config: import("./wallet-account-read-only-tron.js").TronWalletConfig;
     /** @private */
-    private _path;
+    private _signer;
+    _isActive: boolean;
+    get isActive(): boolean;
     /**
-     * The tron wallet account configuration.
-     *
-     * @protected
-     * @type {TronWalletConfig}
-     */
-    protected _config: TronWalletConfig;
-    /**
-     * The account's hd key.
-     *
-     * @protected
-     * @type {HDKey}
-     */
-    protected _account: HDKey;
-    /**
-     * The derivation path's index of this account.
-     *
+     * The derivation path index of this account.
      * @type {number}
      */
     get index(): number;
     /**
-     * The derivation path of this account (see [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki)).
-     *
+     * The full BIP-44 derivation path.
      * @type {string}
      */
     get path(): string;
     /**
      * The account's key pair.
-     *
      * @type {KeyPair}
      */
     get keyPair(): KeyPair;
     /**
-     * Signs a message.
+     * Signs a message using the TRON personal sign format.
      *
-     * @param {string} message - The message to sign.
-     * @returns {Promise<string>} The message's signature.
+     * @param {string} message
+     * @returns {Promise<string>} 0x-prefixed hex signature
      */
     sign(message: string): Promise<string>;
     /**
-     * Sends a transaction.
+     * Sends a TRX transaction.
      *
-     * @param {TronTransaction} tx - The transaction.
-     * @returns {Promise<TransactionResult>} The transaction's result.
+     * @param {TronTransaction} tx
+     * @returns {Promise<TransactionResult>}
      */
-    sendTransaction(tx: TronTransaction): Promise<TransactionResult>;
+    sendTransaction({ to, value }: TronTransaction): Promise<TransactionResult>;
     /**
-     * Transfers a token to another address.
+     * Transfers a TRC-20 token.
      *
-     * @param {TransferOptions} options - The transfer's options.
-     * @returns {Promise<TransferResult>} The transfer's result.
+     * @param {TransferOptions} options
+     * @returns {Promise<TransferResult>}
      */
-    transfer(options: TransferOptions): Promise<TransferResult>;
+    transfer({ token, recipient, amount }: TransferOptions): Promise<TransferResult>;
     /**
-     * Returns a read-only copy of the account.
-     *
-     * @returns {Promise<WalletAccountReadOnlyTron>} The read-only account.
+     * Returns a read-only copy of this account.
+     * @returns {Promise<WalletAccountReadOnlyTron>}
      */
     toReadOnlyAccount(): Promise<WalletAccountReadOnlyTron>;
     /**
-     * Disposes the wallet account, erasing the private key from the memory.
+     * Disposes the account and clears private key from memory.
      */
     dispose(): void;
     /** @private */
-    private _signTransaction;
+    private _buildSignedTransaction;
 }
 export type IWalletAccount = import("@tetherto/wdk-wallet").IWalletAccount;
 export type KeyPair = import("@tetherto/wdk-wallet").KeyPair;
@@ -84,4 +85,3 @@ export type TransferResult = import("@tetherto/wdk-wallet").TransferResult;
 export type TronTransaction = import("./wallet-account-read-only-tron.js").TronTransaction;
 export type TronWalletConfig = import("./wallet-account-read-only-tron.js").TronWalletConfig;
 import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js';
-import { HDKey } from '@scure/bip32';

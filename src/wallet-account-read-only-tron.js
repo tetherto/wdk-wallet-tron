@@ -34,7 +34,7 @@ import { TronWeb, Trx } from 'tronweb'
 
 /**
  * @typedef {Object} TronWalletConfig
- * @property {string | TronWeb} [provider] - The url of the tron web provider, or an instance of the {@link TronWeb} class.
+ * @property {string | import('tronweb').TronWeb} [provider] - The url of the tron web provider, or an instance of the {@link TronWeb} class.
  * @property {number | bigint} [transferMaxFee] - The maximum fee amount for transfer operations.
  */
 
@@ -65,7 +65,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
        * The tron web client.
        *
        * @protected
-       * @type {TronWeb | undefined}
+       * @type {import('tronweb').TronWeb | undefined}
        */
       this._tronWeb = typeof provider === 'string'
         ? new TronWeb({ fullHost: provider })
@@ -125,7 +125,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
 
     const balance = this._tronWeb.toBigNumber('0x' + result.constant_result[0])
 
-    return BigInt(balance)
+    return BigInt(balance.toFixed(0))
   }
 
   /**

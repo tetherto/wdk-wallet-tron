@@ -1,6 +1,7 @@
+import { createRequire } from 'module'
 import { beforeEach, describe, expect, jest, test } from '@jest/globals'
 
-import { TronWeb, Trx } from 'tronweb'
+import { TronWeb as RealTronWeb, Trx as RealTrx } from 'tronweb'
 
 const ADDRESS = 'TXngH8bVadn9ZWtKBgjKQcqN1GsZ7A1jcb'
 
@@ -13,30 +14,30 @@ const triggerConstantContractMock = jest.fn()
 const sendTrxMock = jest.fn()
 
 jest.unstable_mockModule('tronweb', () => {
-  const TronWebMock = jest.fn().mockImplementation((options) => {
-    const provider = new TronWeb(options)
-
-    provider.trx = {
+  const TronWebMock = jest.fn().mockImplementation(() => ({
+    trx: {
       getBalance: getBalanceMock,
       getAccountResources: getAccountResourcesMock,
       getTransactionInfo: getTransactionInfoMock,
       getChainParameters: getChainParametersMock
-    }
-
-    provider.transactionBuilder = {
+    },
+    transactionBuilder: {
       triggerConstantContract: triggerConstantContractMock,
       sendTrx: sendTrxMock
-    }
+    },
+    address: RealTronWeb.address,
+    toBigNumber: RealTronWeb.toBigNumber
+  }))
 
-    return provider
-  })
-
-  // Assigns static properties of the 'TronWeb' class to the mock constructor:
-  Object.defineProperties(TronWebMock, Object.getOwnPropertyDescriptors(TronWeb))
+  // Expose real address utilities as static properties so that source files
+  // using TronWeb.address.toHex(...) get the real implementation.
+  TronWebMock.address = RealTronWeb.address
+  TronWebMock.toBigNumber = RealTronWeb.toBigNumber
 
   return {
+    default: TronWebMock,
     TronWeb: TronWebMock,
-    Trx
+    Trx: RealTrx
   }
 })
 
@@ -117,8 +118,8 @@ describe('WalletAccountReadOnlyTron', () => {
         TOKEN_ADDRESS,
         'balanceOf(address)',
         {},
-        [{ type: 'address', value: TronWeb.address.toHex(ADDRESS) }],
-        TronWeb.address.toHex(ADDRESS)
+        [{ type: 'address', value: RealTronWeb.address.toHex(ADDRESS) }],
+        RealTronWeb.address.toHex(ADDRESS)
       )
 
       expect(balance).toBe(1_000_000n)
@@ -207,10 +208,10 @@ describe('WalletAccountReadOnlyTron', () => {
         'transfer(address,uint256)',
         {},
         [
-          { type: 'address', value: TronWeb.address.toHex(TRANSFER.recipient) },
+          { type: 'address', value: RealTronWeb.address.toHex(TRANSFER.recipient) },
           { type: 'uint256', value: TRANSFER.amount }
         ],
-        TronWeb.address.toHex(ADDRESS)
+        RealTronWeb.address.toHex(ADDRESS)
       )
 
       expect(getAccountResourcesMock).toHaveBeenCalledWith(ADDRESS)

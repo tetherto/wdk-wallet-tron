@@ -17,9 +17,9 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      * The tron web client.
      *
      * @protected
-     * @type {TronWeb | undefined}
+     * @type {import('tronweb').TronWeb | undefined}
      */
-    protected _tronWeb: TronWeb | undefined;
+    protected _tronWeb: import("tronweb").TronWeb | undefined;
     /**
      * Verifies a message's signature.
      *
@@ -28,33 +28,6 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      * @returns {Promise<boolean>} True if the signature is valid.
      */
     verify(message: string, signature: string): Promise<boolean>;
-    /**
-     * Returns the account's tronix balance.
-     *
-     * @returns {Promise<bigint>} The tronix balance (in suns).
-     */
-    getBalance(): Promise<bigint>;
-    /**
-     * Returns the account balance for a specific token.
-     *
-     * @param {string} tokenAddress - The smart contract address of the token.
-     * @returns {Promise<bigint>} The token balance (in base unit).
-     */
-    getTokenBalance(tokenAddress: string): Promise<bigint>;
-    /**
-     * Quotes the costs of a send transaction operation.
-     *
-     * @param {TronTransaction} tx - The transaction.
-     * @returns {Promise<Omit<TransactionResult, 'hash'>>} The transaction's quotes.
-     */
-    quoteSendTransaction(tx: TronTransaction): Promise<Omit<TransactionResult, "hash">>;
-    /**
-     * Quotes the costs of a transfer operation.
-     *
-     * @param {TransferOptions} options - The transfer's options.
-     * @returns {Promise<Omit<TransferResult, 'hash'>>} The transfer's quotes.
-     */
-    quoteTransfer(options: TransferOptions): Promise<Omit<TransferResult, "hash">>;
     /**
      * Returns a transaction's receipt.
      *
@@ -71,7 +44,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      */
     protected _getBandwidthCost(transaction: Transaction<TriggerSmartContract>): Promise<number>;
 }
-export type Transaction<T> = import("tronweb").Transaction<T>;
+export type Transaction = import("tronweb").Transaction;
 export type TriggerSmartContract = import("tronweb").TriggerSmartContract;
 export type TronTransactionReceipt = import("tronweb").TransactionInfo;
 export type TransactionResult = import("@tetherto/wdk-wallet").TransactionResult;
@@ -91,11 +64,10 @@ export type TronWalletConfig = {
     /**
      * - The url of the tron web provider, or an instance of the {@link TronWeb} class.
      */
-    provider?: string | TronWeb;
+    provider?: string | import("tronweb").TronWeb;
     /**
      * - The maximum fee amount for transfer operations.
      */
     transferMaxFee?: number | bigint;
 };
 import { WalletAccountReadOnly } from '@tetherto/wdk-wallet';
-import TronWeb from 'tronweb'

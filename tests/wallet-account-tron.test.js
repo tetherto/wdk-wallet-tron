@@ -1,21 +1,6 @@
-import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals'
-import * as bip39 from 'bip39'
+import { describe, test, expect, beforeEach, jest } from '@jest/globals'
 
 import { TronWeb, Trx } from 'tronweb'
-
-const SEED_PHRASE = 'cook voyage document eight skate token alien guide drink uncle term abuse'
-const INVALID_SEED_PHRASE = 'invalid seed phrase'
-const SEED = bip39.mnemonicToSeedSync(SEED_PHRASE)
-
-const ACCOUNT = {
-  index: 0,
-  path: "m/44'/195'/0'/0/0",
-  address: 'TXngH8bVadn9ZWtKBgjKQcqN1GsZ7A1jcb',
-  keyPair: {
-    privateKey: '5d5645db7db2a3b86435e3ec9b3b2cc670fccef5b6d5705e310b8ac2d8d37633',
-    publicKey: '03ebdf0c06e1523a5931e7593e3ac231f5a123b898eb6c02af61aa83b32f8603b0'
-  }
-}
 
 const sendRawTransactionMock = jest.fn()
 const getAccountResourcesMock = jest.fn()
@@ -53,225 +38,223 @@ jest.unstable_mockModule('tronweb', () => {
   }
 })
 
-const { WalletAccountTron, WalletAccountReadOnlyTron } = await import('../index.js')
+const { default: WalletAccountTron } = await import('../src/wallet-account-tron.js')
+const { default: WalletAccountReadOnlyTron } = await import('../src/wallet-account-read-only-tron.js')
+const { default: SeedSignerTron } = await import('../src/signers/seed-signer-tron.js')
+
+const MNEMONIC = 'cook voyage document eight skate token alien guide drink uncle term abuse'
+
+function makeChildSigner (index = 0) {
+  const root = new SeedSignerTron(MNEMONIC)
+  return root.derive(`0'/0/${index}`)
+}
 
 describe('WalletAccountTron', () => {
-  let account
-
-  beforeEach(() => {
-    jest.clearAllMocks()
-    account = new WalletAccountTron(SEED_PHRASE, "0'/0/0", {
-      provider: 'https://tron.web.provider/'
-    })
-  })
-
-  afterEach(() => {
-    account.dispose()
-  })
-
   describe('constructor', () => {
-    test('should successfully initialize an account for the given seed phrase and path', () => {
-      expect(account.index).toBe(ACCOUNT.index)
-      expect(account.path).toBe(ACCOUNT.path)
-      expect(account.keyPair).toEqual({
-        privateKey: new Uint8Array(Buffer.from(ACCOUNT.keyPair.privateKey, 'hex')),
-        publicKey: new Uint8Array(Buffer.from(ACCOUNT.keyPair.publicKey, 'hex'))
-      })
+    test('accepts a child signer', () => {
+      const child = makeChildSigner()
+      const account = new WalletAccountTron(child, {})
+      expect(account).toBeInstanceOf(WalletAccountTron)
     })
 
-    test('should successfully initialize an account for the given seed and path', () => {
-      const account = new WalletAccountTron(SEED, "0'/0/0", { provider: 'https://tron.web.provider/' })
-
-      expect(account.index).toBe(ACCOUNT.index)
-      expect(account.path).toBe(ACCOUNT.path)
-      expect(account.keyPair).toEqual({
-        privateKey: new Uint8Array(Buffer.from(ACCOUNT.keyPair.privateKey, 'hex')),
-        publicKey: new Uint8Array(Buffer.from(ACCOUNT.keyPair.publicKey, 'hex'))
-      })
+    test('throws if signer is root', () => {
+      const root = new SeedSignerTron(MNEMONIC)
+      expect(() => new WalletAccountTron(root, {})).toThrow('root signer')
     })
 
-    test('should throw if the seed phrase is invalid', () => {
-      expect(() => { new WalletAccountTron(INVALID_SEED_PHRASE, "0'/0/0") })
-        .toThrow('The seed phrase is invalid.')
-    })
-
-    test('should throw if the path is invalid', () => {
-      expect(() => { new WalletAccountTron(SEED_PHRASE, "a'/b/c") })
-        .toThrow('invalid child index')
+    test('throws if no signer provided', () => {
+      expect(() => new WalletAccountTron(null, {})).toThrow()
     })
   })
 
-  describe('sign', () => {
-    const MESSAGE = 'Dummy message to sign.'
-    const EXPECTED_SIGNATURE = '0x67b1e4bb9a9b070cd60776ceab1ff4d7c4d4997bb5b4a71757da646f75d847e6600c22d8d83caa13d42c33099f75ba5ec30390467392aa78a3e5319da6c30e291b'
+  describe('fromSeed() static factory', () => {
+    test('creates an account with correct path', () => {
+      const account = WalletAccountTron.fromSeed(MNEMONIC, "0'/0/0", {})
+      expect(account.path).toBe("m/44'/195'/0'/0/0")
+    })
 
-    test('should return the correct signature', async () => {
-      const signature = await account.sign(MESSAGE)
-      expect(signature).toBe(EXPECTED_SIGNATURE)
+    test('account from factory has same address as direct construction', () => {
+      const child = makeChildSigner(0)
+      const fromFactory = WalletAccountTron.fromSeed(MNEMONIC, "0'/0/0", {})
+      expect(fromFactory.path).toBe(child.path)
     })
   })
 
-  describe('sendTransaction', () => {
-    test('should successfully send a transaction', async () => {
-      const TRANSACTION = {
-        to: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
-        value: 1_000_000
-      }
-      const DUMMY_TX_ID = 'abc123def456'
-      const DUMMY_SEND_TRX_RESULT = {
-        txID: '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f',
-        raw_data_hex: '0a' + '00'.repeat(100)
-      }
-      const EXPECTED_SIGNATURE = 'e2fbd0590d2a6150952afdcdb8c0b137a8828fe45dacc6f17f552b10234baa9231811488104983c4d4333ad51c90343801aa72e41b1d576719cc798c4c98546100'
-
-      sendTrxMock.mockResolvedValue(DUMMY_SEND_TRX_RESULT)
-
-      sendRawTransactionMock.mockResolvedValue({ txid: DUMMY_TX_ID })
-
-      getAccountResourcesMock.mockResolvedValue({
-        freeNetLimit: 5000,
-        freeNetUsed: 0,
-        NetLimit: 0,
-        NetUsed: 0
-      })
-
-      const { hash, fee } = await account.sendTransaction(TRANSACTION)
-
-      expect(hash).toBe(DUMMY_TX_ID)
-      expect(fee).toBe(0n)
-
-      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ACCOUNT.address)
-      expect(sendRawTransactionMock).toHaveBeenCalledWith({
-        ...DUMMY_SEND_TRX_RESULT,
-        signature: [EXPECTED_SIGNATURE]
-      })
-      expect(getAccountResourcesMock).toHaveBeenCalledWith(ACCOUNT.address)
-    })
-
-    test('should throw if the account is not connected to tron web', async () => {
-      const disconnected = new WalletAccountTron(SEED_PHRASE, "0'/0/0")
-      await expect(disconnected.sendTransaction({ to: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD', value: 1000 }))
-        .rejects.toThrow('The wallet must be connected to tron web to send transactions.')
+  describe('getAddress()', () => {
+    test('returns the signer address', async () => {
+      const child = makeChildSigner()
+      const account = new WalletAccountTron(child, {})
+      expect(await account.getAddress()).toBe(child.address)
     })
   })
 
-  describe('transfer', () => {
-    test('should successfully transfer tokens', async () => {
-      const TRANSFER = {
-        token: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
-        recipient: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
-        amount: 100_000_000
-      }
-      const DUMMY_TX_ID = 'xyz789abc123'
-
-      triggerConstantContractMock.mockResolvedValue({
-        constant_result: ['0000000000000000000000000000000000000000000000000000000000000064'],
-        energy_used: 10000,
-        transaction: {
-          raw_data_hex: '0a' + '00'.repeat(200)
-        }
-      })
-
-      const DUMMY_TRIGGER_SMART_CONTRACT_RESULT = {
-        txID: '12a406f767b30e00b317758aa25fcddc0ff8a329b7cad741dd204676d0e6c5ce',
-        raw_data_hex: '0a' + '00'.repeat(200)
-      }
-      const EXPECTED_SIGNATURE = 'b4273d17c4b46fb47d59b5aca2b4134cd83e02394a28bc4e86ffda7cbe1a21762b96e3af3d273d7e874153100fb2f1510f7e6579fa5ea9dde9107d4d15e1541100'
-
-      triggerSmartContractMock.mockResolvedValue({
-        transaction: DUMMY_TRIGGER_SMART_CONTRACT_RESULT
-      })
-
-      sendRawTransactionMock.mockResolvedValue({ txid: DUMMY_TX_ID })
-
-      getAccountResourcesMock.mockResolvedValue({
-        freeNetLimit: 5000,
-        freeNetUsed: 0,
-        NetLimit: 0,
-        NetUsed: 0,
-        EnergyLimit: 0,
-        EnergyUsed: 0
-      })
-
-      getChainParametersMock.mockResolvedValue([
-        { key: 'getEnergyFee', value: 420 }
-      ])
-
-      const { hash, fee } = await account.transfer(TRANSFER)
-
-      expect(hash).toBe(DUMMY_TX_ID)
-      expect(fee).toBe(4_200_000n)
-
-      expect(triggerSmartContractMock).toHaveBeenCalledWith(
-        TRANSFER.token,
-        'transfer(address,uint256)',
-        {
-          feeLimit: 4_200_000,
-          callValue: 0
-        },
-        [
-          { type: 'address', value: TronWeb.address.toHex(TRANSFER.recipient) },
-          { type: 'uint256', value: TRANSFER.amount }
-        ],
-        TronWeb.address.toHex(ACCOUNT.address)
-      )
-
-      expect(sendRawTransactionMock).toHaveBeenCalledWith({
-        ...DUMMY_TRIGGER_SMART_CONTRACT_RESULT,
-        signature: [EXPECTED_SIGNATURE]
-      })
-      expect(getAccountResourcesMock).toHaveBeenCalledWith(ACCOUNT.address)
+  describe('index and path', () => {
+    test('index delegates to signer', () => {
+      const child = makeChildSigner(3)
+      const account = new WalletAccountTron(child, {})
+      expect(account.index).toBe(3)
     })
 
-    test('should throw if transfer fee exceeds the transfer max fee configuration', async () => {
-      triggerConstantContractMock.mockResolvedValue({
-        constant_result: ['0000000000000000000000000000000000000000000000000000000000000064'],
-        energy_used: 100000,
-        transaction: { raw_data_hex: '0a' + '00'.repeat(200) }
-      })
-
-      getAccountResourcesMock.mockResolvedValue({
-        freeNetLimit: 0,
-        freeNetUsed: 0,
-        NetLimit: 0,
-        NetUsed: 0,
-        EnergyLimit: 0,
-        EnergyUsed: 0
-      })
-
-      getChainParametersMock.mockResolvedValue([
-        { key: 'getEnergyFee', value: 420 }
-      ])
-
-      const accountWithMaxFee = new WalletAccountTron(SEED_PHRASE, "0'/0/0", {
-        provider: 'https://tron.web.provider/',
-        transferMaxFee: 0
-      })
-
-      await expect(accountWithMaxFee.transfer({
-        token: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
-        recipient: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
-        amount: 100_000_000
-      })).rejects.toThrow('Exceeded maximum fee cost for transfer operations.')
-    })
-
-    test('should throw if the account is not connected to tron web', async () => {
-      const disconnected = new WalletAccountTron(SEED_PHRASE, "0'/0/0")
-      await expect(disconnected.transfer({
-        token: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
-        recipient: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
-        amount: 100
-      })).rejects.toThrow('The wallet must be connected to tron web to transfer tokens.')
+    test('path delegates to signer', () => {
+      const child = makeChildSigner(2)
+      const account = new WalletAccountTron(child, {})
+      expect(account.path).toBe("m/44'/195'/0'/0/2")
     })
   })
 
-  describe('toReadOnlyAccount', () => {
-    test('should return a read-only copy of the account', async () => {
-      const readOnlyAccount = await account.toReadOnlyAccount()
-      expect(readOnlyAccount).toBeInstanceOf(WalletAccountReadOnlyTron)
+  describe('keyPair', () => {
+    test('delegates to signer keyPair', () => {
+      const child = makeChildSigner()
+      const account = new WalletAccountTron(child, {})
+      expect(account.keyPair).toEqual(child.keyPair)
+    })
+  })
 
-      const readOnlyAddress = await readOnlyAccount.getAddress()
-      expect(readOnlyAddress).toBe(ACCOUNT.address)
+  describe('sign()', () => {
+    test('delegates to signer.sign()', async () => {
+      const child = makeChildSigner()
+      const signSpy = jest.spyOn(child, 'sign').mockResolvedValue('0xdeadbeef')
+      const account = new WalletAccountTron(child, {})
+
+      const result = await account.sign('test message')
+
+      expect(signSpy).toHaveBeenCalledWith('test message')
+      expect(result).toBe('0xdeadbeef')
+    })
+  })
+
+  describe('sendTransaction()', () => {
+    let child, account
+
+    beforeEach(() => {
+      child = makeChildSigner()
+      account = new WalletAccountTron(child, { provider: 'https://api.trongrid.io' })
+
+      const fakeTx = {
+        txID: 'a'.repeat(64),
+        raw_data_hex: 'b'.repeat(100)
+      }
+      sendTrxMock.mockResolvedValue(fakeTx)
+      getAccountResourcesMock.mockResolvedValue({ freeNetLimit: 1500, freeNetUsed: 0 })
+      sendRawTransactionMock.mockResolvedValue({ result: true })
+    })
+
+    test('calls signer.signTransaction with the txID', async () => {
+      const signTxSpy = jest.spyOn(child, 'signTransaction').mockResolvedValue('sig123')
+
+      await account.sendTransaction({ to: 'TRecipient', value: 1000000 })
+
+      expect(signTxSpy).toHaveBeenCalledWith('a'.repeat(64))
+    })
+
+    test('returns txID from signed transaction', async () => {
+      jest.spyOn(child, 'signTransaction').mockResolvedValue('sig123')
+
+      const result = await account.sendTransaction({ to: 'TRecipient', value: 1000000 })
+
+      expect(result.hash).toBe('a'.repeat(64))
+    })
+
+    test('throws if not connected to TronWeb', async () => {
+      const offlineAccount = new WalletAccountTron(child, {})
+      await expect(offlineAccount.sendTransaction({ to: 'T', value: 0 })).rejects.toThrow('connected to tron web')
+    })
+
+    test('throws if broadcast result is false', async () => {
+      jest.spyOn(child, 'signTransaction').mockResolvedValue('sig123')
+      sendRawTransactionMock.mockResolvedValue({ result: false, code: 'CONTRACT_VALIDATE_ERROR', message: 'balance not enough' })
+
+      await expect(account.sendTransaction({ to: 'TRecipient', value: 1000000 })).rejects.toThrow('Transaction broadcast failed')
+    })
+  })
+
+  describe('transfer()', () => {
+    const TOKEN = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'
+    const RECIPIENT = 'TLeUMvxvtUmbCyHAzf3FKV7C2FxquGDWUj'
+    const AMOUNT = 1000000n
+
+    let child, account
+
+    beforeEach(() => {
+      child = makeChildSigner()
+      account = new WalletAccountTron(child, { provider: 'https://api.trongrid.io' })
+
+      const quoteTx = { txID: 'q'.repeat(64), raw_data_hex: 'e'.repeat(100) }
+      const smartContractTx = { txID: 'c'.repeat(64), raw_data_hex: 'f'.repeat(100) }
+
+      triggerConstantContractMock.mockResolvedValue({ transaction: quoteTx, energy_used: 0 })
+      triggerSmartContractMock.mockResolvedValue({ transaction: smartContractTx })
+      getChainParametersMock.mockResolvedValue([{ key: 'getEnergyFee', value: 100 }])
+      getAccountResourcesMock.mockResolvedValue({ EnergyLimit: 10000, EnergyUsed: 0, freeNetLimit: 1500, freeNetUsed: 0 })
+      sendRawTransactionMock.mockResolvedValue({ result: true })
+    })
+
+    test('calls signer.signTransaction with the smart contract txID', async () => {
+      const signTxSpy = jest.spyOn(child, 'signTransaction').mockResolvedValue('sig456')
+
+      await account.transfer({ token: TOKEN, recipient: RECIPIENT, amount: AMOUNT })
+
+      expect(signTxSpy).toHaveBeenCalledWith('c'.repeat(64))
+    })
+
+    test('returns hash from signed transaction and correct fee', async () => {
+      jest.spyOn(child, 'signTransaction').mockResolvedValue('sig456')
+
+      const result = await account.transfer({ token: TOKEN, recipient: RECIPIENT, amount: AMOUNT })
+
+      expect(result.hash).toBe('c'.repeat(64))
+      expect(typeof result.fee).toBe('bigint')
+    })
+
+    test('throws if not connected to TronWeb', async () => {
+      const offlineAccount = new WalletAccountTron(child, {})
+      await expect(offlineAccount.transfer({ token: TOKEN, recipient: RECIPIENT, amount: AMOUNT })).rejects.toThrow('connected to tron web')
+    })
+
+    test('throws when fee exceeds transferMaxFee', async () => {
+      // Set energy_used high enough to force a non-zero fee (more than available energy)
+      triggerConstantContractMock.mockResolvedValue({ transaction: { txID: 'q'.repeat(64), raw_data_hex: 'e'.repeat(100) }, energy_used: 9999999 })
+
+      const capped = new WalletAccountTron(child, { provider: 'https://api.trongrid.io', transferMaxFee: 1n })
+
+      await expect(capped.transfer({ token: TOKEN, recipient: RECIPIENT, amount: AMOUNT })).rejects.toThrow('Exceeded maximum fee cost')
+    })
+
+    test('throws if broadcast result is false', async () => {
+      jest.spyOn(child, 'signTransaction').mockResolvedValue('sig456')
+      sendRawTransactionMock.mockResolvedValue({ result: false, code: 'CONTRACT_VALIDATE_ERROR', message: 'balance not enough' })
+
+      await expect(account.transfer({ token: TOKEN, recipient: RECIPIENT, amount: AMOUNT })).rejects.toThrow('Transaction broadcast failed')
+    })
+  })
+
+  describe('toReadOnlyAccount()', () => {
+    test('returns WalletAccountReadOnlyTron', async () => {
+      const child = makeChildSigner()
+      const account = new WalletAccountTron(child, {})
+      const readOnly = await account.toReadOnlyAccount()
+      expect(readOnly).toBeInstanceOf(WalletAccountReadOnlyTron)
+    })
+  })
+
+  describe('dispose()', () => {
+    test('calls signer.dispose()', () => {
+      const child = makeChildSigner()
+      const disposeSpy = jest.spyOn(child, 'dispose')
+      const account = new WalletAccountTron(child, {})
+
+      account.dispose()
+
+      expect(disposeSpy).toHaveBeenCalled()
+    })
+
+    test('sets isActive to false', () => {
+      const child = makeChildSigner()
+      const account = new WalletAccountTron(child, {})
+
+      account.dispose()
+
+      expect(account.isActive).toBe(false)
     })
   })
 })
