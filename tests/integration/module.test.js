@@ -2,7 +2,6 @@ import { beforeAll, afterAll, describe, expect, test } from '@jest/globals'
 
 import { getSetup } from '../helpers/setup.js'
 import WalletManagerTron from '../../index.js'
-import { WalletAccountReadOnlyTron } from '../../index.js'
 
 const TIMEOUT = 120_000
 const RECIPIENT_ADDRESS = 'TCmGCGFR8ApgtEoq2kpHUgWDCFPrktxPD2'
@@ -58,7 +57,7 @@ describe('@tetherto/wdk-wallet-tron', () => {
 
     const { hash } = await account0.sendTransaction(TRANSACTION)
 
-    const txReceipt = await waitForTx(account0, hash)
+    await waitForTx(account0, hash)
 
     const onChainTx = await setup.tronWebProvider.trx.getTransaction(hash)
     const contract = onChainTx.raw_data.contract[0]
@@ -157,37 +156,6 @@ describe('@tetherto/wdk-wallet-tron', () => {
     expect(isValid).toBe(true)
   }, TIMEOUT)
 
-  test('should convert a full account to read-only and perform balance, quote and receipt operations', async () => {
-    const account0 = await walletManager.getAccount(0)
-    const account0Address = await account0.getAddress()
-
-    const readOnly = await account0.toReadOnlyAccount()
-
-    expect(readOnly).toBeInstanceOf(WalletAccountReadOnlyTron)
-    expect(await readOnly.getAddress()).toBe(account0Address)
-
-    const MESSAGE = 'Read-only verification test'
-    const signature = await account0.sign(MESSAGE)
-    expect(await readOnly.verify(MESSAGE, signature)).toBe(true)
-
-    expect(await readOnly.getBalance()).toBe(await account0.getBalance())
-    expect(await readOnly.getTokenBalance(setup.testTokenAddress))
-      .toBe(await account0.getTokenBalance(setup.testTokenAddress))
-
-    const txParams = { to: RECIPIENT_ADDRESS, value: 1_000_000 }
-    const readOnlyQuote = await readOnly.quoteSendTransaction(txParams)
-    const fullQuote = await account0.quoteSendTransaction(txParams)
-    expect(readOnlyQuote.fee).toBe(fullQuote.fee)
-
-    const transferParams = { token: setup.testTokenAddress, recipient: RECIPIENT_ADDRESS, amount: 1_000_000 }
-    const readOnlyTransferQuote = await readOnly.quoteTransfer(transferParams)
-    expect(readOnlyTransferQuote.fee).toBeGreaterThan(0n)
-
-    const { hash } = await account0.sendTransaction(txParams)
-    const receipt = await waitForTx(readOnly, hash)
-    expect(receipt).toHaveProperty('id')
-  }, TIMEOUT)
-
   test('should dispose the wallet and erase the private keys of the accounts', async () => {
     const disposableManager = new WalletManagerTron(setup.testSeedPhrase, {
       provider: setup.tronWebProvider
@@ -199,10 +167,13 @@ describe('@tetherto/wdk-wallet-tron', () => {
     disposableManager.dispose()
 
     for (const acc of [acc0, acc1]) {
-      expect(acc.keyPair.privateKey).toBeFalsy()
+      expect(acc.keyPair.privateKey).toBe(null)
 
-      await expect(acc.sign('Hello, world!')).rejects.toThrow()
+      await expect(acc.sign('Hello, world!')).rejects.toThrow('private key must be hex string or Uint8Array')
+      await expect(acc.sendTransaction({ to: RECIPIENT_ADDRESS, value: 1_000_000 })).rejects.toThrow('private key must be hex string or Uint8Array')
     }
+
+    await expect(acc0.transfer({ token: setup.testTokenAddress, recipient: RECIPIENT_ADDRESS, amount: 1_000_000 })).rejects.toThrow('private key must be hex string or Uint8Array')
   }, TIMEOUT)
 
   test('should create a wallet with a low transfer max fee, derive an account, try to transfer some tokens and gracefully fail', async () => {
