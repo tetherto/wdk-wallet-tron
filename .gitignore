@@ -5,8 +5,6 @@ coverage
 /artifacts/
 /cache/
 /cache_hardhat-tron/
-**/artifacts-tron/
-**/cache-tron/
 
 # Docker Tron node data
 datadir/

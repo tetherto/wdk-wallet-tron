@@ -179,7 +179,7 @@ async function _waitForNode (tronWeb, maxRetries = 30, interval = 2_000) {
     await _sleep(interval)
   }
 
-  throw new Error(`Tron node at ${TRON_NODE_URL} did not become ready in time.`)
+  throw new Error(`Tron node at ${TRON_FULL_NODE_URL} did not become ready in time.`)
 }
 
 /**
@@ -191,15 +191,7 @@ async function _waitForNode (tronWeb, maxRetries = 30, interval = 2_000) {
  * @returns {Promise<string>}
  */
 async function _deployTestToken (tronWeb) {
-  const artifactPath = path.join(
-    PROJECT_ROOT,
-    'tests',
-    'artifacts',
-    'artifacts-tron',
-    'contracts',
-    'TestToken.sol',
-    'TestToken.json'
-  )
+  const artifactPath = path.join(PROJECT_ROOT, 'tests', 'artifacts', 'TestToken.json')
 
   if (!fs.existsSync(artifactPath)) {
     throw new Error(
