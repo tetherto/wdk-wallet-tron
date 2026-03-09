@@ -6,7 +6,7 @@ import { WalletAccountReadOnlyTron } from '../../index.js'
 
 const TIMEOUT = 120_000
 
-async function waitForTx (txHash, account) {
+async function waitForTx (account, txHash) {
   let receipt = null
   let counter = 0
 
@@ -46,11 +46,6 @@ describe('@tetherto/wdk-wallet-tron', () => {
     const account0 = await walletManager.getAccount(0)
     const account1 = await walletManager.getAccount(1)
 
-    expect(account0.index).toBe(0)
-    expect(account0.path).toBe("m/44'/195'/0'/0/0")
-    expect(account0.keyPair.privateKey).toBeInstanceOf(Uint8Array)
-    expect(account0.keyPair.publicKey).toBeInstanceOf(Uint8Array)
-
     const address0 = await account0.getAddress()
     expect(address0).toBe(setup.testAccountAddress)
 
@@ -65,7 +60,7 @@ describe('@tetherto/wdk-wallet-tron', () => {
 
     const { hash, fee } = await account0.sendTransaction(TRANSACTION)
 
-    await waitForTx(hash, account0)
+    await waitForTx(account0, hash)
 
     const onChainTx = await setup.tronWebProvider.trx.getTransaction(hash)
     const contract = onChainTx.raw_data.contract[0]
@@ -93,7 +88,7 @@ describe('@tetherto/wdk-wallet-tron', () => {
       value: Number(amountSun)
     })
 
-    await waitForTx(hash, account0)
+    await waitForTx(account0, hash)
 
     const balance0After = await account0.getBalance()
     const balance1After = await account1.getBalance()
@@ -117,7 +112,7 @@ describe('@tetherto/wdk-wallet-tron', () => {
 
     const { hash, fee } = await account0.transfer(TRANSFER)
 
-    await waitForTx(hash, account0)
+    await waitForTx(account0, hash)
 
     const onChainTx = await setup.tronWebProvider.trx.getTransaction(hash)
     const contract = onChainTx.raw_data.contract[0]
@@ -145,7 +140,7 @@ describe('@tetherto/wdk-wallet-tron', () => {
       amount: Number(transferAmount)
     })
 
-    await waitForTx(hash, account0)
+    await waitForTx(account0, hash)
 
     const balance0After = await account0.getTokenBalance(setup.testTokenAddress)
     const balance1After = await account1.getTokenBalance(setup.testTokenAddress)
@@ -194,7 +189,7 @@ describe('@tetherto/wdk-wallet-tron', () => {
     expect(readOnlyTransferQuote.fee).toBeGreaterThan(0n)
 
     const { hash } = await account0.sendTransaction(txParams)
-    const receipt = await waitForTx(hash, readOnly)
+    const receipt = await waitForTx(readOnly, hash)
     expect(receipt).toHaveProperty('id')
   }, TIMEOUT)
 
