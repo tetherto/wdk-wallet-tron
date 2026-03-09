@@ -5,6 +5,7 @@ import WalletManagerTron from '../../index.js'
 import { WalletAccountReadOnlyTron } from '../../index.js'
 
 const TIMEOUT = 120_000
+const RECIPIENT_ADDRESS = 'TCmGCGFR8ApgtEoq2kpHUgWDCFPrktxPD2'
 
 async function waitForTx (account, txHash) {
   let receipt = null
@@ -44,15 +45,12 @@ describe('@tetherto/wdk-wallet-tron', () => {
 
   test('should derive an account, quote the cost of a tx and send the tx', async () => {
     const account0 = await walletManager.getAccount(0)
-    const account1 = await walletManager.getAccount(1)
 
     const address0 = await account0.getAddress()
     expect(address0).toBe(setup.testAccountAddress)
 
-    const account1Address = await account1.getAddress()
-
     const TRANSACTION = {
-      to: account1Address,
+      to: RECIPIENT_ADDRESS,
       value: 1_000_000
     }
 
@@ -68,7 +66,7 @@ describe('@tetherto/wdk-wallet-tron', () => {
     expect(onChainTx.txID).toBe(hash)
     expect(contract.type).toBe('TransferContract')
     expect(contract.parameter.value.amount).toBe(TRANSACTION.value)
-    expect(setup.tronWebProvider.address.fromHex(contract.parameter.value.to_address)).toBe(account1Address)
+    expect(setup.tronWebProvider.address.fromHex(contract.parameter.value.to_address)).toBe(RECIPIENT_ADDRESS)
 
     expect(fee).toBe(estimatedFee)
   }, TIMEOUT)
@@ -99,12 +97,10 @@ describe('@tetherto/wdk-wallet-tron', () => {
 
   test('should derive an account by its path, quote the cost of transferring a token and transfer a token', async () => {
     const account0 = await walletManager.getAccountByPath("0'/0/0")
-    const account1 = await walletManager.getAccountByPath("0'/0/1")
-    const account1Address = await account1.getAddress()
 
     const TRANSFER = {
       token: setup.testTokenAddress,
-      recipient: account1Address,
+      recipient: RECIPIENT_ADDRESS,
       amount: 1_000_000
     }
 
@@ -126,27 +122,27 @@ describe('@tetherto/wdk-wallet-tron', () => {
 
   test('should derive two accounts by their paths, transfer a token from account 0 to 1 and get the correct balances and token balances', async () => {
     const account0 = await walletManager.getAccountByPath("0'/0/0")
-    const account1 = await walletManager.getAccountByPath("0'/0/1")
-    const account1Address = await account1.getAddress()
+
+    const tokenContract = await setup.genesisTronWeb.contract().at(setup.testTokenAddress)
 
     const balance0Before = await account0.getTokenBalance(setup.testTokenAddress)
-    const balance1Before = await account1.getTokenBalance(setup.testTokenAddress)
+    const recipientBalanceBefore = BigInt(await tokenContract.balanceOf(RECIPIENT_ADDRESS).call())
 
     const transferAmount = 1_000_000n
 
     const { hash } = await account0.transfer({
       token: setup.testTokenAddress,
-      recipient: account1Address,
+      recipient: RECIPIENT_ADDRESS,
       amount: Number(transferAmount)
     })
 
     await waitForTx(account0, hash)
 
     const balance0After = await account0.getTokenBalance(setup.testTokenAddress)
-    const balance1After = await account1.getTokenBalance(setup.testTokenAddress)
+    const recipientBalanceAfter = BigInt(await tokenContract.balanceOf(RECIPIENT_ADDRESS).call())
 
     expect(balance0After).toBe(balance0Before - transferAmount)
-    expect(balance1After).toBe(balance1Before + transferAmount)
+    expect(recipientBalanceAfter).toBe(recipientBalanceBefore + transferAmount)
   }, TIMEOUT)
 
   test('should derive an account, sign a message and verify its signature', async () => {
@@ -162,9 +158,7 @@ describe('@tetherto/wdk-wallet-tron', () => {
 
   test('should convert a full account to read-only and perform balance, quote and receipt operations', async () => {
     const account0 = await walletManager.getAccount(0)
-    const account1 = await walletManager.getAccount(1)
     const account0Address = await account0.getAddress()
-    const account1Address = await account1.getAddress()
 
     const readOnly = await account0.toReadOnlyAccount()
 
@@ -179,12 +173,12 @@ describe('@tetherto/wdk-wallet-tron', () => {
     expect(await readOnly.getTokenBalance(setup.testTokenAddress))
       .toBe(await account0.getTokenBalance(setup.testTokenAddress))
 
-    const txParams = { to: account1Address, value: 1_000_000 }
+    const txParams = { to: RECIPIENT_ADDRESS, value: 1_000_000 }
     const readOnlyQuote = await readOnly.quoteSendTransaction(txParams)
     const fullQuote = await account0.quoteSendTransaction(txParams)
     expect(readOnlyQuote.fee).toBe(fullQuote.fee)
 
-    const transferParams = { token: setup.testTokenAddress, recipient: account1Address, amount: 1_000_000 }
+    const transferParams = { token: setup.testTokenAddress, recipient: RECIPIENT_ADDRESS, amount: 1_000_000 }
     const readOnlyTransferQuote = await readOnly.quoteTransfer(transferParams)
     expect(readOnlyTransferQuote.fee).toBeGreaterThan(0n)
 
@@ -220,7 +214,7 @@ describe('@tetherto/wdk-wallet-tron', () => {
 
     const TRANSFER = {
       token: setup.testTokenAddress,
-      recipient: await (await walletManager.getAccount(1)).getAddress(),
+      recipient: RECIPIENT_ADDRESS,
       amount: 1_000_000
     }
 
