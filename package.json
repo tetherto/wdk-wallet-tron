@@ -21,9 +21,9 @@
     "build:types": "tsc",
     "lint": "standard",
     "lint:fix": "standard --fix",
-    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --testPathIgnorePatterns=tests/integration",
-    "test:coverage": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --coverage --testPathIgnorePatterns=tests/integration",
-    "test:integration": "cross-env NODE_OPTIONS=--experimental-vm-modules jest tests/integration/module.test.js --testTimeout 120000 --transform '{}' --runInBand",
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:coverage": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --coverage",
+    "test:integration": "cross-env NODE_OPTIONS=--experimental-vm-modules jest tests/integration/module.test.js --testTimeout 120000",
     "test:integration:docker:up": "docker compose -f tests/artifacts/docker-compose.yml up -d --wait",
     "test:integration:docker:down": "docker compose -f tests/artifacts/docker-compose.yml down"
   },
