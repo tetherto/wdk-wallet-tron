@@ -57,12 +57,15 @@ export async function getSetup () {
   })
 
   const walletManager = new WalletManagerTron(TEST_SEED_PHRASE, { provider: tronWebProvider })
-  const testAccount = await walletManager.getAccount(0)
-  const testAccountAddress = await testAccount.getAddress()
+  const testAccount0 = await walletManager.getAccount(0)
+  const testAccount1 = await walletManager.getAccount(1)
+  const testAccountAddress = await testAccount0.getAddress()
+  const testAccount1Address = await testAccount1.getAddress()
 
   const testTokenAddress = await _deployTestToken(genesisTronWeb)
 
   await _sendTrx(genesisTronWeb, testAccountAddress, FUND_TRX_AMOUNT)
+  await _sendTrx(genesisTronWeb, testAccount1Address, FUND_TRX_AMOUNT)
   await _transferTokens(genesisTronWeb, testTokenAddress, testAccountAddress, FUND_TOKEN_AMOUNT)
 
   walletManager.dispose()
@@ -70,6 +73,7 @@ export async function getSetup () {
   _setup = {
     testSeedPhrase: TEST_SEED_PHRASE,
     testAccountAddress,
+    testAccount1Address,
     testTokenAddress,
     genesisTronWeb,
     tronWebProvider

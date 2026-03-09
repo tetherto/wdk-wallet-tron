@@ -36,20 +36,10 @@ describe('@tetherto/wdk-wallet-tron', () => {
     walletManager = new WalletManagerTron(setup.testSeedPhrase, {
       provider: setup.tronWebProvider
     })
-
-    const account0 = await walletManager.getAccount(0)
-    const account1 = await walletManager.getAccount(1)
-    const account1Address = await account1.getAddress()
-
-    const { hash } = await account0.sendTransaction({
-      to: account1Address,
-      value: 100_000_000
-    })
-    await waitForTx(hash, account0)
   }, TIMEOUT)
 
   afterAll(() => {
-    walletManager?.dispose()
+    walletManager.dispose()
   })
 
   test('should derive an account, quote the cost of a tx and send the tx', async () => {
