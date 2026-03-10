@@ -53,11 +53,12 @@ describe('@tetherto/wdk-wallet-tron', () => {
       value: 1_000_000
     }
 
-    await account0.quoteSendTransaction(TRANSACTION)
+    const { fee: estimatedFee } = await account0.quoteSendTransaction(TRANSACTION)
 
-    const { hash } = await account0.sendTransaction(TRANSACTION)
+    const { hash, fee } = await account0.sendTransaction(TRANSACTION)
 
-    await waitForTx(account0, hash)
+    const receipt = await waitForTx(account0, hash)
+    const actualFee = BigInt(receipt.fee || 0)
 
     const onChainTx = await setup.tronWebProvider.trx.getTransaction(hash)
     const contract = onChainTx.raw_data.contract[0]
@@ -66,6 +67,9 @@ describe('@tetherto/wdk-wallet-tron', () => {
     expect(contract.type).toBe('TransferContract')
     expect(contract.parameter.value.amount).toBe(TRANSACTION.value)
     expect(setup.tronWebProvider.address.fromHex(contract.parameter.value.to_address)).toBe(RECIPIENT_ADDRESS)
+
+    expect(estimatedFee).toBe(actualFee)
+    expect(fee).toBe(actualFee)
   }, TIMEOUT)
 
   test('should derive two accounts, send a tx from account 0 to 1 and get the correct balances', async () => {
@@ -73,19 +77,22 @@ describe('@tetherto/wdk-wallet-tron', () => {
     const account1 = await walletManager.getAccount(1)
     const account1Address = await account1.getAddress()
 
+    const balance0Before = await account0.getBalance()
     const balance1Before = await account1.getBalance()
 
     const amountSun = 1_000_000n
 
-    const { hash } = await account0.sendTransaction({
+    const { hash, fee } = await account0.sendTransaction({
       to: account1Address,
       value: amountSun
     })
 
     await waitForTx(account0, hash)
 
+    const balance0After = await account0.getBalance()
     const balance1After = await account1.getBalance()
 
+    expect(balance0After).toBe(balance0Before - amountSun - fee)
     expect(balance1After).toBe(balance1Before + amountSun)
   }, TIMEOUT)
 
@@ -125,6 +132,7 @@ describe('@tetherto/wdk-wallet-tron', () => {
 
     const tokenContract = await setup.genesisTronWeb.contract().at(setup.testTokenAddress)
 
+    const trxBefore = await account0.getBalance()
     const balance0Before = await account0.getTokenBalance(setup.testTokenAddress)
     const recipientBalanceBefore = BigInt(await tokenContract.balanceOf(RECIPIENT_ADDRESS).call())
 
@@ -136,11 +144,14 @@ describe('@tetherto/wdk-wallet-tron', () => {
       amount: transferAmount
     })
 
-    await waitForTx(account0, hash)
+    const receipt = await waitForTx(account0, hash)
+    const actualFee = BigInt(receipt.fee || 0)
 
+    const trxAfter = await account0.getBalance()
     const balance0After = await account0.getTokenBalance(setup.testTokenAddress)
     const recipientBalanceAfter = BigInt(await tokenContract.balanceOf(RECIPIENT_ADDRESS).call())
 
+    expect(trxAfter).toBe(trxBefore - actualFee)
     expect(balance0After).toBe(balance0Before - transferAmount)
     expect(recipientBalanceAfter).toBe(recipientBalanceBefore + transferAmount)
   }, TIMEOUT)
