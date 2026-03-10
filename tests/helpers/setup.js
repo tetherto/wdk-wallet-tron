@@ -18,7 +18,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import TronWeb from 'tronweb'
+import { TronWeb } from 'tronweb'
 
 import WalletManagerTron from '../../index.js'
 
