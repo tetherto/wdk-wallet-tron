@@ -171,7 +171,7 @@ console.log('Transfer fee estimate:', transferQuote.fee, 'sun')
 
 ### Message Signing and Verification
 
-Sign and verify messages using `WalletAccountTron`.
+Sign messages using `WalletAccountTron`. Verify messages using `WalletAccountReadOnlyTron` (or `WalletAccountTron` which extends it).
 
 ```javascript
 // Sign a message
@@ -335,7 +335,6 @@ new WalletAccountTron(seed, path, config)
 |--------|-------------|---------|
 | `getAddress()` | Returns the account's address | `Promise<string>` |
 | `sign(message)` | Signs a message using the account's private key | `Promise<string>` |
-| `verify(message, signature)` | Verifies a message signature | `Promise<boolean>` |
 | `sendTransaction(tx)` | Sends a Tron transaction | `Promise<{hash: string, fee: bigint}>` |
 | `quoteSendTransaction(tx)` | Estimates the fee for a Tron transaction | `Promise<{fee: bigint}>` |
 | `transfer(options)` | Transfers TRC20 tokens to another address | `Promise<{hash: string, fee: bigint}>` |
@@ -367,21 +366,6 @@ Signs a message using the account's private key.
 ```javascript
 const signature = await account.sign('Hello Tron!')
 console.log('Signature:', signature)
-```
-
-##### `verify(message, signature)`
-Verifies a message signature using the account's public key.
-
-**Parameters:**
-- `message` (string): Original message
-- `signature` (string): Signature as hex string
-
-**Returns:** `Promise<boolean>` - True if signature is valid
-
-**Example:**
-```javascript
-const isValid = await account.verify('Hello Tron!', signature)
-console.log('Signature valid:', isValid)
 ```
 
 ##### `sendTransaction(tx)`
@@ -534,10 +518,26 @@ new WalletAccountReadOnlyTron(address, config)
 
 | Method | Description | Returns |
 |--------|-------------|---------|
+| `verify(message, signature)` | Verifies a message signature | `Promise<boolean>` |
 | `getBalance()` | Returns the native TRX balance (in sun) | `Promise<bigint>` |
 | `getTokenBalance(tokenAddress)` | Returns the balance of a specific TRC20 token | `Promise<bigint>` |
 | `quoteSendTransaction(tx)` | Estimates the fee for a Tron transaction | `Promise<{fee: bigint}>` |
 | `quoteTransfer(options)` | Estimates the fee for a TRC20 transfer | `Promise<{fee: bigint}>` |
+
+##### `verify(message, signature)`
+Verifies a message signature using the account's address.
+
+**Parameters:**
+- `message` (string): Original message
+- `signature` (string): Signature as hex string
+
+**Returns:** `Promise<boolean>` - True if signature is valid
+
+**Example:**
+```javascript
+const isValid = await readOnlyAccount.verify('Hello Tron!', signature)
+console.log('Signature valid:', isValid)
+```
 
 ##### `getBalance()`
 Returns the account's native TRX balance in sun.
