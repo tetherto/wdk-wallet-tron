@@ -71,28 +71,22 @@ export default class WalletManagerTron extends WalletManager {
     const { provider, retries = 3 } = config
 
     if (Array.isArray(provider)) {
-      this._tronWeb = provider
-        .reduce(
-          /**
-           * @param {FailoverProvider<TronWeb>} failover
-           * @param {string | TronWeb} provider
-           */
-          (failover, provider) =>
-            failover.addProvider(
-              typeof provider === 'string'
-                ? new TronWeb({ fullHost: provider })
-                : provider
-            ),
-          new FailoverProvider({ retries })
-        )
-        .initialize()
+      if (provider.length > 0) {
+        const failoverProvider = new FailoverProvider({ retries })
+
+        for (const entry of provider) {
+          const option = typeof entry === 'string'
+            ? new TronWeb({ fullHost: entry })
+            : entry
+          failoverProvider.addProvider(option)
+        }
+
+        this._provider = failoverProvider.initialize()
+      }
     } else if (provider) {
-      this._tronWeb =
-        typeof provider === 'string'
-          ? new TronWeb({ fullHost: provider })
-          : provider
-    } else {
-      this._tronWeb = undefined
+      this._tronWeb = typeof provider === 'string'
+        ? new TronWeb({ fullHost: provider })
+        : provider
     }
   }
 
@@ -135,15 +129,11 @@ export default class WalletManagerTron extends WalletManager {
    */
   async getFeeRates () {
     if (!this._tronWeb) {
-      throw new Error(
-        'The wallet must be connected to tron web to get fee rates.'
-      )
+      throw new Error('The wallet must be connected to tron web to get fee rates.')
     }
 
     const chainParameters = await this._tronWeb.trx.getChainParameters()
-    const getTransactionFee = chainParameters.find(
-      ({ key }) => key === 'getTransactionFee'
-    )
+    const getTransactionFee = chainParameters.find(({ key }) => key === 'getTransactionFee')
     const fee = BigInt(getTransactionFee.value)
 
     return {
