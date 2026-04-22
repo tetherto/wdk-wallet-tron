@@ -216,11 +216,12 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    * @returns {Promise<WalletAccountReadOnlyTron>} The read-only account.
    */
   async toReadOnlyAccount () {
-    const address = await this.getAddress()
+    if (!this._tronReadOnlyAccount) {
+      const address = await this.getAddress()
+      this._tronReadOnlyAccount = new WalletAccountReadOnlyTron(address, this._config)
+    }
 
-    const readOnlyAccount = new WalletAccountReadOnlyTron(address, this._config)
-
-    return readOnlyAccount
+    return this._tronReadOnlyAccount
   }
 
   /**
