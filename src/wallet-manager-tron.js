@@ -20,7 +20,7 @@ import TronWeb from 'tronweb'
 
 import WalletAccountTron from './wallet-account-tron.js'
 
-import FailoverProvider from 'wdk-failover-provider'
+import FailoverProvider from '@tetherto/wdk-failover-provider'
 
 /** @typedef {import("@tetherto/wdk-wallet").FeeRates} FeeRates */
 
