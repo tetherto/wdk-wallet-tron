@@ -20,6 +20,8 @@ import TronWeb from 'tronweb'
 
 import WalletAccountTron from './wallet-account-tron.js'
 
+import FailoverProvider from '@tetherto/wdk-failover-provider'
+
 /** @typedef {import("@tetherto/wdk-wallet").FeeRates} FeeRates */
 
 /** @typedef {import('./wallet-account-tron.js').TronWalletConfig} TronWalletConfig */
@@ -58,19 +60,13 @@ export default class WalletManagerTron extends WalletManager {
      */
     this._config = config
 
-    const { provider } = config
-
-    if (provider) {
-      /**
-       * The tron web client.
-       *
-       * @protected
-       * @type {TronWeb | undefined}
-       */
-      this._tronWeb = typeof provider === 'string'
-        ? new TronWeb({ fullHost: provider })
-        : provider
-    }
+    /**
+     * The tron web client.
+     *
+     * @protected
+     * @type {TronWeb | undefined}
+     */
+    this._tronWeb = WalletAccountTron._initializeProvider(config)
   }
 
   /**
@@ -120,8 +116,8 @@ export default class WalletManagerTron extends WalletManager {
     const fee = BigInt(getTransactionFee.value)
 
     return {
-      normal: fee * WalletManagerTron._FEE_RATE_NORMAL_MULTIPLIER / 100n,
-      fast: fee * WalletManagerTron._FEE_RATE_FAST_MULTIPLIER / 100n
+      normal: (fee * WalletManagerTron._FEE_RATE_NORMAL_MULTIPLIER) / 100n,
+      fast: (fee * WalletManagerTron._FEE_RATE_FAST_MULTIPLIER) / 100n
     }
   }
 }

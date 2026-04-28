@@ -16,6 +16,8 @@
 
 import { WalletAccountReadOnly } from '@tetherto/wdk-wallet'
 
+import FailoverProvider from '@tetherto/wdk-failover-provider'
+
 import TronWeb from 'tronweb'
 
 /** @typedef {import('tronweb').Transaction} Transaction */
@@ -34,7 +36,8 @@ import TronWeb from 'tronweb'
 
 /**
  * @typedef {Object} TronWalletConfig
- * @property {string | TronWeb} [provider] - The url of the tron web provider, or an instance of the {@link TronWeb} class.
+ * @property {string | TronWeb | Array<string | TronWeb>} [provider] - The url of the tron web provider, or an instance of the {@link TronWeb} class. It's also possible to provide a list of urls or {@link TronWeb} instances instead. In such case, connection errors will cause the wallet to automatically fallback on the next provider in the list.
+ * @property {number} [retries] - If set and if 'provider' is a list of urls or {@link TronWeb} instances, the number of additional retry attempts after the initial call fails. Total attempts = `1 + retries`. For example, `retries: 3` with 4 providers will try each provider once before throwing. If `retries` exceeds the number of providers, the failover will loop back and retry already-failed providers in round-robin order. Default: 3.
  * @property {number | bigint} [transferMaxFee] - The maximum fee amount for transfer operations.
  */
 
@@ -47,7 +50,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    * @param {string} address - The account's address.
    * @param {Omit<TronWalletConfig, 'transferMaxFee'>} [config] - The configuration object.
    */
-  constructor (address, config = { }) {
+  constructor (address, config = {}) {
     super(address)
 
     /**
@@ -58,19 +61,13 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      */
     this._config = config
 
-    const { provider } = config
-
-    if (provider) {
-      /**
-       * The tron web client.
-       *
-       * @protected
-       * @type {TronWeb | undefined}
-       */
-      this._tronWeb = typeof provider === 'string'
-        ? new TronWeb({ fullHost: provider })
-        : provider
-    }
+    /**
+     * The tron web client.
+     *
+     * @protected
+     * @type {TronWeb | undefined}
+     */
+    this._tronWeb = WalletAccountReadOnlyTron._initializeProvider(config)
   }
 
   /**
@@ -233,5 +230,35 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     const bandwitdth = Math.ceil(rawDataHex.length * BANDWIDTH_PRICE)
 
     return bandwitdth
+  }
+
+  /**
+   * Initializes the tron web provider with optional failover support.
+   *
+   * @protected
+   * @param {Omit<TronWalletConfig, 'transferMaxFee'>} config - The read-only wallet account configuration.
+   * @returns {TronWeb | undefined} The initialized tron web provider.
+   */
+  static _initializeProvider (config) {
+    const { provider, retries = 3 } = config
+
+    if (Array.isArray(provider)) {
+      if (!provider.length) return undefined
+
+      const failoverProvider = new FailoverProvider({ retries })
+
+      for (const entry of provider) {
+        const option = typeof entry === 'string'
+          ? new TronWeb({ fullHost: entry })
+          : entry
+        failoverProvider.addProvider(option)
+      }
+
+      return failoverProvider.initialize()
+    }
+
+    return typeof provider === 'string'
+      ? new TronWeb({ fullHost: provider })
+      : provider
   }
 }
