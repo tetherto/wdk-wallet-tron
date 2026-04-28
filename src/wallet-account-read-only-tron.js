@@ -82,7 +82,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
           failoverProvider.addProvider(option)
         }
 
-        this._provider = failoverProvider.initialize()
+        this._tronWeb = failoverProvider.initialize()
       }
     } else if (provider) {
       this._tronWeb = typeof provider === 'string'
