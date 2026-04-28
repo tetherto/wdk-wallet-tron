@@ -66,28 +66,7 @@ export default class WalletManagerTron extends WalletManager {
      * @protected
      * @type {TronWeb | undefined}
      */
-    this._tronWeb = undefined
-
-    const { provider, retries = 3 } = config
-
-    if (Array.isArray(provider)) {
-      if (provider.length > 0) {
-        const failoverProvider = new FailoverProvider({ retries })
-
-        for (const entry of provider) {
-          const option = typeof entry === 'string'
-            ? new TronWeb({ fullHost: entry })
-            : entry
-          failoverProvider.addProvider(option)
-        }
-
-        this._provider = failoverProvider.initialize()
-      }
-    } else if (provider) {
-      this._tronWeb = typeof provider === 'string'
-        ? new TronWeb({ fullHost: provider })
-        : provider
-    }
+    this._tronWeb = WalletAccountTron._initializeProvider(config)
   }
 
   /**
