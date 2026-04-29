@@ -31,9 +31,9 @@ export default class WalletManagerTron extends WalletManager {
      * The tron web client.
      *
      * @protected
-     * @type {TronWeb | undefined}
+     * @type {ReturnType<typeof WalletAccountTron.initializeProvider>}
      */
-    protected _tronWeb: TronWeb | undefined;
+    protected _tronWeb: ReturnType<typeof WalletAccountTron.initializeProvider>;
     /**
      * Returns the wallet account at a specific index (see [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki)).
      *
@@ -65,4 +65,3 @@ export type FeeRates = import("@tetherto/wdk-wallet").FeeRates;
 export type TronWalletConfig = import("./wallet-account-tron.js").TronWalletConfig;
 import WalletAccountTron from './wallet-account-tron.js';
 import WalletManager from '@tetherto/wdk-wallet';
-import TronWeb from 'tronweb'

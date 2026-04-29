@@ -73,11 +73,10 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     /**
      * Initializes the tron web provider with optional failover support.
      *
-     * @protected
      * @param {Omit<TronWalletConfig, 'transferMaxFee'>} config - The read-only wallet account configuration.
      * @returns {TronWeb | undefined} The initialized tron web provider.
      */
-    protected static _initializeProvider(config: Omit<TronWalletConfig, "transferMaxFee">): TronWeb | undefined;
+    static initializeProvider(config: Omit<TronWalletConfig, "transferMaxFee">): TronWeb | undefined;
 }
 export type Transaction<T> = import("tronweb").Transaction<T>;
 export type TriggerSmartContract = import("tronweb").TriggerSmartContract;

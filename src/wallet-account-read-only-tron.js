@@ -235,11 +235,10 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
   /**
    * Initializes the tron web provider with optional failover support.
    *
-   * @protected
    * @param {Omit<TronWalletConfig, 'transferMaxFee'>} config - The read-only wallet account configuration.
    * @returns {TronWeb | undefined} The initialized tron web provider.
    */
-  static _initializeProvider (config) {
+  static initializeProvider (config) {
     const { provider, retries = 3 } = config
 
     if (Array.isArray(provider)) {

@@ -60,9 +60,9 @@ export default class WalletManagerTron extends WalletManager {
      * The tron web client.
      *
      * @protected
-     * @type {ReturnType<typeof WalletAccountTron._initializeProvider>}
+     * @type {ReturnType<typeof WalletAccountTron.initializeProvider>}
      */
-    this._tronWeb = WalletAccountTron._initializeProvider(config)
+    this._tronWeb = WalletAccountTron.initializeProvider(config)
   }
 
   /**
