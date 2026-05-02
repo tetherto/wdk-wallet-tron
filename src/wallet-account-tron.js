@@ -14,7 +14,7 @@
 
 'use strict'
 
-import TronWeb from 'tronweb'
+import { TronWeb } from 'tronweb'
 
 // eslint-disable-next-line camelcase
 import { keccak_256 } from '@noble/hashes/sha3'
@@ -36,6 +36,8 @@ import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js'
 
 /** @typedef {import('./wallet-account-read-only-tron.js').TronTransaction} TronTransaction */
 /** @typedef {import('./wallet-account-read-only-tron.js').TronWalletConfig} TronWalletConfig */
+
+/** @typedef {import('tronweb').Types.SignedTransaction} SignedTransaction */
 
 const BIP_44_TRON_DERIVATION_PATH_PREFIX = "m/44'/195'"
 
@@ -146,6 +148,24 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
     const hex = Buffer.from(signatureWithRecovery).toString('hex')
 
     return '0x' + hex
+  }
+
+  /**
+   * Signs a transaction.
+   *
+   * @param {TronTransaction} tx - The transaction to sign.
+   * @returns {Promise<SignedTransaction>} The signed transaction.
+   */
+  async signTransaction ({ to, value }) {
+    if (!this._tronWeb) {
+      throw new Error('The wallet must be connected to tron web to sign transactions.')
+    }
+
+    const address = await this.getAddress()
+
+    const transaction = await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
+
+    return await this._signTransaction(transaction)
   }
 
   /**
