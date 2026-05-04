@@ -71,9 +71,9 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      */
     protected _getBandwidthCost(transaction: Transaction<TriggerSmartContract>): Promise<number>;
 }
-export type Transaction<T> = import("tronweb").Transaction<T>;
-export type TriggerSmartContract = import("tronweb").TriggerSmartContract;
-export type TronTransactionReceipt = import("tronweb").TransactionInfo;
+export type Transaction = import("tronweb").Types.Transaction;
+export type TriggerSmartContract = import("tronweb").Types.TriggerSmartContract;
+export type TronTransactionReceipt = import("tronweb").Types.TransactionInfo;
 export type TransactionResult = import("@tetherto/wdk-wallet").TransactionResult;
 export type TransferOptions = import("@tetherto/wdk-wallet").TransferOptions;
 export type TransferResult = import("@tetherto/wdk-wallet").TransferResult;
@@ -98,4 +98,4 @@ export type TronWalletConfig = {
     transferMaxFee?: number | bigint;
 };
 import { WalletAccountReadOnly } from '@tetherto/wdk-wallet';
-import TronWeb from 'tronweb'
+import { TronWeb } from 'tronweb';
