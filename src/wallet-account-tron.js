@@ -43,7 +43,7 @@ const BIP_44_TRON_DERIVATION_PATH_PREFIX = "m/44'/195'"
 
 function getTronAddress (publicKey) {
   const uncompressedPublicKey = secp256k1.Point.fromHex(publicKey)
-    .toRawBytes(false)
+    .toBytes(false)
     .slice(1)
 
   const publicKeyHash = keccak_256(uncompressedPublicKey)
