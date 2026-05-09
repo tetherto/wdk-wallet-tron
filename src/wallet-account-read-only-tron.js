@@ -38,7 +38,8 @@ import { TronWeb, Trx } from 'tronweb'
  * @property {number | bigint} [transferMaxFee] - The maximum fee amount for transfer operations.
  */
 
-const BANDWIDTH_PRICE = 1_000
+// Protobuf framing (5) + secp256k1 signature (65) + MAX_RESULT_SIZE_IN_TX (64)
+const TRANSACTION_OVERHEAD = 134
 
 export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
   /**
@@ -215,6 +216,8 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    */
   async _getBandwidthCost (transaction) {
     const rawDataHex = transaction.raw_data_hex
+    const rawDataBytes = rawDataHex.length / 2
+    const transactionSize = rawDataBytes + TRANSACTION_OVERHEAD
 
     const address = await this.getAddress()
 
@@ -224,14 +227,13 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     const frozenBandwidthLeft = (resources.NetLimit || 0) - (resources.NetUsed || 0)
     const totalAvailableBandwidth = freeBandwidthLeft + frozenBandwidthLeft
 
-    const missingBandwidth = rawDataHex.length - totalAvailableBandwidth
-
-    if (missingBandwidth <= 0) {
+    if (transactionSize <= totalAvailableBandwidth) {
       return 0
     }
 
-    const bandwitdth = Math.ceil(rawDataHex.length * BANDWIDTH_PRICE)
+    const chainParameters = await this._tronWeb.trx.getChainParameters()
+    const { value: bandwidthPrice } = chainParameters.find(({ key }) => key === 'getTransactionFee')
 
-    return bandwitdth
+    return transactionSize * bandwidthPrice
   }
 }
