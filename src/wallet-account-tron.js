@@ -37,11 +37,13 @@ import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js'
 /** @typedef {import('./wallet-account-read-only-tron.js').TronTransaction} TronTransaction */
 /** @typedef {import('./wallet-account-read-only-tron.js').TronWalletConfig} TronWalletConfig */
 
+/** @typedef {import('tronweb').Types.SignedTransaction} SignedTransaction */
+
 const BIP_44_TRON_DERIVATION_PATH_PREFIX = "m/44'/195'"
 
 function getTronAddress (publicKey) {
   const uncompressedPublicKey = secp256k1.Point.fromHex(publicKey)
-    .toRawBytes(false)
+    .toBytes(false)
     .slice(1)
 
   const publicKeyHash = keccak_256(uncompressedPublicKey)
@@ -149,6 +151,24 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
   }
 
   /**
+   * Signs a transaction.
+   *
+   * @param {TronTransaction} tx - The transaction to sign.
+   * @returns {Promise<SignedTransaction>} The signed transaction.
+   */
+  async signTransaction ({ to, value }) {
+    if (!this._tronWeb) {
+      throw new Error('The wallet must be connected to tron web to sign transactions.')
+    }
+
+    const address = await this.getAddress()
+
+    const transaction = await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
+
+    return await this._signTransaction(transaction)
+  }
+
+  /**
    * Sends a transaction.
    *
    * @param {TronTransaction} tx - The transaction.
@@ -216,11 +236,12 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    * @returns {Promise<WalletAccountReadOnlyTron>} The read-only account.
    */
   async toReadOnlyAccount () {
-    const address = await this.getAddress()
+    if (!this._tronReadOnlyAccount) {
+      const address = await this.getAddress()
+      this._tronReadOnlyAccount = new WalletAccountReadOnlyTron(address, this._config)
+    }
 
-    const readOnlyAccount = new WalletAccountReadOnlyTron(address, this._config)
-
-    return readOnlyAccount
+    return this._tronReadOnlyAccount
   }
 
   /**

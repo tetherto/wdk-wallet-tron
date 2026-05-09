@@ -111,6 +111,29 @@ describe('WalletAccountTron', () => {
     })
   })
 
+  describe('signTransaction', () => {
+    test('should sign a transaction and return the signed tx', async () => {
+      const TRANSACTION = {
+        to: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
+        value: 1_000_000
+      }
+      const DUMMY_SEND_TRX_RESULT = {
+        txID: '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f',
+        raw_data_hex: '0a' + '00'.repeat(100)
+      }
+      const EXPECTED_SIGNATURE = 'e2fbd0590d2a6150952afdcdb8c0b137a8828fe45dacc6f17f552b10234baa9231811488104983c4d4333ad51c90343801aa72e41b1d576719cc798c4c98546100'
+
+      sendTrxMock.mockResolvedValue(DUMMY_SEND_TRX_RESULT)
+
+      const signedTx = await account.signTransaction(TRANSACTION)
+
+      expect(signedTx).toEqual({
+        ...DUMMY_SEND_TRX_RESULT,
+        signature: [EXPECTED_SIGNATURE]
+      })
+    })
+  })
+
   describe('sendTransaction', () => {
     test('should successfully send a transaction', async () => {
       const TRANSACTION = {

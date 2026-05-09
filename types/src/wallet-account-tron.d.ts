@@ -50,6 +50,13 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron impleme
      */
     sign(message: string): Promise<string>;
     /**
+     * Signs a transaction.
+     *
+     * @param {TronTransaction} tx - The transaction to sign.
+     * @returns {Promise<SignedTransaction>} The signed transaction.
+     */
+    signTransaction({ to, value }: TronTransaction): Promise<SignedTransaction>;
+    /**
      * Sends a transaction.
      *
      * @param {TronTransaction} tx - The transaction.
@@ -83,5 +90,6 @@ export type TransferOptions = import("@tetherto/wdk-wallet").TransferOptions;
 export type TransferResult = import("@tetherto/wdk-wallet").TransferResult;
 export type TronTransaction = import("./wallet-account-read-only-tron.js").TronTransaction;
 export type TronWalletConfig = import("./wallet-account-read-only-tron.js").TronWalletConfig;
+export type SignedTransaction = import("tronweb").Types.SignedTransaction;
 import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js';
 import { HDKey } from '@scure/bip32';
