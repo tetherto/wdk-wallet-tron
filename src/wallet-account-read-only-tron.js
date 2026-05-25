@@ -39,6 +39,8 @@ import { TronWeb, Trx } from 'tronweb'
  */
 
 const BANDWIDTH_PRICE = 1_000
+const ACCOUNT_ACTIVATION_FEE_SUN = 1_000_000
+const ACCOUNT_ACTIVATION_FEE_ENERGY = 25_000
 
 export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
   /**
@@ -142,7 +144,14 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     const address = await this.getAddress()
 
     const transaction = await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
-    const fee = await this._getBandwidthCost(transaction)
+    const bandwidthCost = await this._getBandwidthCost(transaction)
+
+    const recipientAccount = await this._tronWeb.trx.getAccount(to)
+    const activationFee = Object.keys(recipientAccount).length === 0
+      ? ACCOUNT_ACTIVATION_FEE_SUN
+      : 0
+
+    const fee = bandwidthCost + activationFee
 
     return { fee: BigInt(fee) }
   }
@@ -167,8 +176,14 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     ]
 
     // eslint-disable-next-line camelcase
-    const { transaction, energy_used } = await this._tronWeb.transactionBuilder
+    let { transaction, energy_used } = await this._tronWeb.transactionBuilder
       .triggerConstantContract(token, 'transfer(address,uint256)', {}, parameters, addressHex)
+
+    const recipientAccount = await this._tronWeb.trx.getAccount(recipient)
+    if (Object.keys(recipientAccount).length === 0) {
+      // eslint-disable-next-line camelcase
+      energy_used += ACCOUNT_ACTIVATION_FEE_ENERGY
+    }
 
     const chainParameters = await this._tronWeb.trx.getChainParameters()
     const { value } = chainParameters.find(({ key }) => key === 'getEnergyFee')
@@ -230,8 +245,8 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
       return 0
     }
 
-    const bandwitdth = Math.ceil(rawDataHex.length * BANDWIDTH_PRICE)
+    const bandwidth = Math.ceil(rawDataHex.length * BANDWIDTH_PRICE)
 
-    return bandwitdth
+    return bandwidth
   }
 }
