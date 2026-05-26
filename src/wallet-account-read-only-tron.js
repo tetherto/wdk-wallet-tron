@@ -246,7 +246,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    * @param {{ isActivation?: boolean }} [options] - The tron web's transaction
    * @returns {Promise<number>} The bandwidth cost in SUN.
    */
-  async _getBandwidthCost(transaction, { isActivation } = {}) {
+  async _getBandwidthCost (transaction, { isActivation } = {}) {
     const rawDataHex = transaction.raw_data_hex
     // Each hex character represents half a byte. We add the signature length (65 bytes)
     // plus approximately 5 bytes of Protobuf overhead for the transaction envelope.

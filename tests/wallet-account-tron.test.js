@@ -18,6 +18,7 @@ const ACCOUNT = {
 }
 
 const sendRawTransactionMock = jest.fn()
+const getAccountMock = jest.fn()
 const getAccountResourcesMock = jest.fn()
 const getChainParametersMock = jest.fn()
 
@@ -31,6 +32,7 @@ jest.unstable_mockModule('tronweb', () => {
 
     provider.trx = {
       sendRawTransaction: sendRawTransactionMock,
+      getAccount: getAccountMock,
       getAccountResources: getAccountResourcesMock,
       getChainParameters: getChainParametersMock
     }
@@ -151,6 +153,8 @@ describe('WalletAccountTron', () => {
 
       sendRawTransactionMock.mockResolvedValue({ txid: DUMMY_TX_ID })
 
+      getAccountMock.mockResolvedValue({ address: TRANSACTION.to })
+
       getAccountResourcesMock.mockResolvedValue({
         freeNetLimit: 5000,
         freeNetUsed: 0,
@@ -164,6 +168,7 @@ describe('WalletAccountTron', () => {
       expect(fee).toBe(0n)
 
       expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ACCOUNT.address)
+      expect(getAccountMock).toHaveBeenCalledWith(TRANSACTION.to)
       expect(sendRawTransactionMock).toHaveBeenCalledWith({
         ...DUMMY_SEND_TRX_RESULT,
         signature: [EXPECTED_SIGNATURE]
@@ -207,6 +212,8 @@ describe('WalletAccountTron', () => {
 
       sendRawTransactionMock.mockResolvedValue({ txid: DUMMY_TX_ID })
 
+      getAccountMock.mockResolvedValue({ address: TRANSFER.recipient })
+
       getAccountResourcesMock.mockResolvedValue({
         freeNetLimit: 5000,
         freeNetUsed: 0,
@@ -224,6 +231,19 @@ describe('WalletAccountTron', () => {
 
       expect(hash).toBe(DUMMY_TX_ID)
       expect(fee).toBe(4_200_000n)
+
+      expect(triggerConstantContractMock).toHaveBeenCalledWith(
+        TRANSFER.token,
+        'transfer(address,uint256)',
+        {},
+        [
+          { type: 'address', value: TronWeb.address.toHex(TRANSFER.recipient) },
+          { type: 'uint256', value: TRANSFER.amount }
+        ],
+        TronWeb.address.toHex(ACCOUNT.address)
+      )
+
+      expect(getAccountMock).toHaveBeenCalledWith(TRANSFER.recipient)
 
       expect(triggerSmartContractMock).toHaveBeenCalledWith(
         TRANSFER.token,
@@ -252,6 +272,8 @@ describe('WalletAccountTron', () => {
         energy_used: 100000,
         transaction: { raw_data_hex: '0a' + '00'.repeat(200) }
       })
+
+      getAccountMock.mockResolvedValue({ address: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD' })
 
       getAccountResourcesMock.mockResolvedValue({
         freeNetLimit: 0,
