@@ -56,6 +56,15 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      */
     quoteTransfer(options: TransferOptions): Promise<Omit<TransferResult, "hash">>;
     /**
+     * Returns the fee of a send transaction operation.
+     *
+     * @protected
+     * @param {Transaction} transaction - The transaction.
+     * @param {string} to - The recipient's address.
+     * @returns {Promise<number>} The transaction's fee in SUN.
+     */
+    protected _getSendTrxFee(transaction: Transaction, to: string): Promise<number>;
+    /**
      * Returns a transaction's receipt.
      *
      * @param {string} hash - The transaction's hash.
@@ -67,9 +76,12 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      *
      * @protected
      * @param {Transaction<TriggerSmartContract>} transaction - The tron web's transaction
-     * @returns {Promise<number>} The bandwidth cost.
+     * @param {{ isActivation?: boolean }} [options] - The tron web's transaction
+     * @returns {Promise<number>} The bandwidth cost in SUN.
      */
-    protected _getBandwidthCost(transaction: Transaction<TriggerSmartContract>): Promise<number>;
+    protected _getBandwidthCost(transaction: Transaction<TriggerSmartContract>, { isActivation }?: {
+        isActivation?: boolean;
+    }): Promise<number>;
 }
 export type Transaction = import("tronweb").Types.Transaction;
 export type TriggerSmartContract = import("tronweb").Types.TriggerSmartContract;
