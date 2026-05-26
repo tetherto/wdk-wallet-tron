@@ -41,6 +41,8 @@ import { TronWeb, Trx } from 'tronweb'
 const BANDWIDTH_PRICE = 1_000
 const ACCOUNT_ACTIVATION_FEE_SUN = 1_000_000
 const ACCOUNT_ACTIVATION_FEE_ENERGY = 25_000
+const ACCOUNT_ACTIVATION_BANDWIDTH_COST = 100_000
+const SIGNATURE_LENGTH_IN_BYTES = 65
 
 export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
   /**
@@ -144,20 +146,21 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     const address = await this.getAddress()
 
     const transaction = await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
-    const bandwidthCost = await this._getBandwidthCost(transaction)
 
     const recipientAccount = await this._tronWeb.trx.getAccount(to)
-    const activationFee = Object.keys(recipientAccount).length === 0
+    const isActivation = Object.keys(recipientAccount).length === 0
+    const activationFee = isActivation
       ? ACCOUNT_ACTIVATION_FEE_SUN
       : 0
 
+    const bandwidthCost = await this._getBandwidthCost(transaction, { isActivation })
     const fee = bandwidthCost + activationFee
 
     return { fee: BigInt(fee) }
   }
 
   /**
-   * Quotes the costs of transfer operation.
+   * Quotes the costs of TRC-20 transfer operation.
    *
    * @param {TransferOptions} options - The transfer's options.
    * @returns {Promise<Omit<TransferResult, 'hash'>>} The transfer's quotes.
@@ -186,15 +189,16 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     }
 
     const chainParameters = await this._tronWeb.trx.getChainParameters()
-    const { value } = chainParameters.find(({ key }) => key === 'getEnergyFee')
+    const { value: energyPrice } = chainParameters.find(({ key }) => key === 'getEnergyFee')
 
     const resources = await this._tronWeb.trx.getAccountResources(address)
     const availableEnergy = (resources.EnergyLimit || 0) - (resources.EnergyUsed || 0)
 
     // eslint-disable-next-line camelcase
-    const energyCost = availableEnergy < energy_used ? Math.ceil(energy_used * value) : 0
+    const missingEnergy = energy_used - availableEnergy
+    const energyCost = missingEnergy > 0 ? Math.ceil(missingEnergy * energyPrice) : 0
 
-    const bandwidthCost = await this._getBandwidthCost(transaction)
+    const bandwidthCost = await this._getBandwidthCost(transaction, { isActivation: false })
 
     const fee = energyCost + bandwidthCost
 
@@ -226,27 +230,33 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    *
    * @protected
    * @param {Transaction<TriggerSmartContract>} transaction - The tron web's transaction
-   * @returns {Promise<number>} The bandwidth cost.
+   * @param {{ isActivation?: boolean }} [options] - The tron web's transaction
+   * @returns {Promise<number>} The bandwidth cost in SUN.
    */
-  async _getBandwidthCost (transaction) {
+  async _getBandwidthCost(transaction, { isActivation } = {}) {
     const rawDataHex = transaction.raw_data_hex
+    // Each hex character represents half a byte. We add the signature length (65 bytes)
+    // plus approximately 5 bytes of Protobuf overhead for the transaction envelope.
+    const txSizeInBytes = Math.ceil(rawDataHex.length / 2) + SIGNATURE_LENGTH_IN_BYTES + 5
 
     const address = await this.getAddress()
-
     const resources = await this._tronWeb.trx.getAccountResources(address)
 
     const freeBandwidthLeft = (resources.freeNetLimit || 0) - (resources.freeNetUsed || 0)
     const frozenBandwidthLeft = (resources.NetLimit || 0) - (resources.NetUsed || 0)
-    const totalAvailableBandwidth = freeBandwidthLeft + frozenBandwidthLeft
 
-    const missingBandwidth = rawDataHex.length - totalAvailableBandwidth
-
-    if (missingBandwidth <= 0) {
+    if (frozenBandwidthLeft >= txSizeInBytes) {
       return 0
     }
 
-    const bandwidth = Math.ceil(rawDataHex.length * BANDWIDTH_PRICE)
+    if (isActivation) {
+      return ACCOUNT_ACTIVATION_BANDWIDTH_COST
+    }
 
-    return bandwidth
+    if (freeBandwidthLeft >= txSizeInBytes) {
+      return 0
+    }
+
+    return txSizeInBytes * BANDWIDTH_PRICE
   }
 }
