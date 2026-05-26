@@ -182,7 +182,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
     const address = await this.getAddress()
 
     const transaction = await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
-    const fee = await this._getBandwidthCost(transaction)
+    const fee = await this._getSendTrxFee(transaction, to)
     const signedTransaction = await this._signTransaction(transaction)
 
     const { txid } = await this._tronWeb.trx.sendRawTransaction(signedTransaction)

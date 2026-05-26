@@ -147,14 +147,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
 
     const transaction = await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
 
-    const recipientAccount = await this._tronWeb.trx.getAccount(to)
-    const isActivation = Object.keys(recipientAccount).length === 0
-    const activationFee = isActivation
-      ? ACCOUNT_ACTIVATION_FEE_SUN
-      : 0
-
-    const bandwidthCost = await this._getBandwidthCost(transaction, { isActivation })
-    const fee = bandwidthCost + activationFee
+    const fee = await this._getSendTrxFee(transaction, to)
 
     return { fee: BigInt(fee) }
   }
@@ -203,6 +196,26 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     const fee = energyCost + bandwidthCost
 
     return { fee: BigInt(fee) }
+  }
+
+  /**
+   * Returns the fee of a send transaction operation.
+   *
+   * @protected
+   * @param {Transaction} transaction - The transaction.
+   * @param {string} to - The recipient's address.
+   * @returns {Promise<number>} The transaction's fee in SUN.
+   */
+  async _getSendTrxFee (transaction, to) {
+    const recipientAccount = await this._tronWeb.trx.getAccount(to)
+    const isActivation = Object.keys(recipientAccount).length === 0
+    const activationFee = isActivation
+      ? ACCOUNT_ACTIVATION_FEE_SUN
+      : 0
+
+    const bandwidthCost = await this._getBandwidthCost(transaction, { isActivation })
+
+    return bandwidthCost + activationFee
   }
 
   /**
