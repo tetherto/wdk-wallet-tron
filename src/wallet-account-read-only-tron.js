@@ -18,11 +18,11 @@ import { WalletAccountReadOnly } from '@tetherto/wdk-wallet'
 
 import FailoverProvider from '@tetherto/wdk-failover-provider'
 
-import TronWeb from 'tronweb'
+import { TronWeb, Trx } from 'tronweb'
 
-/** @typedef {import('tronweb').Transaction} Transaction */
-/** @typedef {import('tronweb').TriggerSmartContract} TriggerSmartContract */
-/** @typedef {import('tronweb').TransactionInfo} TronTransactionReceipt */
+/** @typedef {import('tronweb').Types.Transaction} Transaction */
+/** @typedef {import('tronweb').Types.TriggerSmartContract} TriggerSmartContract */
+/** @typedef {import('tronweb').Types.TransactionInfo} TronTransactionReceipt */
 
 /** @typedef {import('@tetherto/wdk-wallet').TransactionResult} TransactionResult */
 /** @typedef {import('@tetherto/wdk-wallet').TransferOptions} TransferOptions */
@@ -80,9 +80,9 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
   async verify (message, signature) {
     const address = await this.getAddress()
 
-    const recoveredAddress = await TronWeb.Trx.verifyMessageV2(message, signature)
+    const recoveredAddress = Trx.verifyMessageV2(message, signature)
 
-    return address.toLowerCase() === recoveredAddress.toLowerCase()
+    return address === recoveredAddress
   }
 
   /**

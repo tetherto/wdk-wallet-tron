@@ -63,5 +63,5 @@ export default class WalletManagerTron extends WalletManager {
 }
 export type FeeRates = import("@tetherto/wdk-wallet").FeeRates;
 export type TronWalletConfig = import("./wallet-account-tron.js").TronWalletConfig;
-import WalletAccountTron from './wallet-account-tron.js';
 import WalletManager from '@tetherto/wdk-wallet';
+import WalletAccountTron from './wallet-account-tron.js';
