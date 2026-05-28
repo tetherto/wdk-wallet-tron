@@ -67,7 +67,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      * @protected
      * @type {TronWeb | undefined}
      */
-    this._tronWeb = WalletAccountReadOnlyTron._initializeProvider(config)
+    this._tronWeb = WalletAccountReadOnlyTron.initializeProvider(config)
   }
 
   /**
