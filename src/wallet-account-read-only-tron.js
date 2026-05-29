@@ -263,7 +263,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
       return new TronWeb({
         fullNode: fullNodeFailover.initialize(),
         solidityNode: solidityNodeFailover.initialize(),
-        eventServer: eventServerFailover.initialize(),
+        eventServer: eventServerFailover.initialize()
       })
     }
 
