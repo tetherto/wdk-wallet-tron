@@ -45,25 +45,25 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      * Quotes the costs of a send transaction operation.
      *
      * @param {TronTransaction} tx - The transaction.
-     * @returns {Promise<Omit<TransactionResult, 'hash'>>} The transaction's quotes.
+     * @returns {Promise<Omit<TransactionResult, 'hash'> & TronActivationFee>} The transaction's quotes.
      */
-    quoteSendTransaction(tx: TronTransaction): Promise<Omit<TransactionResult, "hash">>;
+    quoteSendTransaction(tx: TronTransaction): Promise<Omit<TransactionResult, "hash"> & TronActivationFee>;
     /**
-     * Quotes the costs of a transfer operation.
+     * Quotes the costs of TRC-20 transfer operation.
      *
      * @param {TransferOptions} options - The transfer's options.
-     * @returns {Promise<Omit<TransferResult, 'hash'>>} The transfer's quotes.
+     * @returns {Promise<Omit<TransferResult, 'hash'> & TronActivationFee>} The transfer's quotes.
      */
-    quoteTransfer(options: TransferOptions): Promise<Omit<TransferResult, "hash">>;
+    quoteTransfer(options: TransferOptions): Promise<Omit<TransferResult, "hash"> & TronActivationFee>;
     /**
      * Returns the fee of a send transaction operation.
      *
      * @protected
-     * @param {Transaction} transaction - The transaction.
      * @param {string} to - The recipient's address.
-     * @returns {Promise<number>} The transaction's fee in SUN.
+     * @param {Transaction} transaction - The transaction.
+     * @returns {Promise<Omit<TransactionResult, 'hash'> & TronActivationFee>} The transaction's fee in SUN.
      */
-    protected _getSendTrxFee(transaction: Transaction, to: string): Promise<number>;
+    protected _getSendTrxFee(to: string, transaction: Transaction): Promise<Omit<TransactionResult, "hash"> & TronActivationFee>;
     /**
      * Returns a transaction's receipt.
      *
@@ -75,13 +75,11 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      * Returns the bandwidth cost of a tron web's transaction.
      *
      * @protected
-     * @param {Transaction<TriggerSmartContract>} transaction - The tron web's transaction
-     * @param {{ isActivation?: boolean }} [options] - The tron web's transaction
-     * @returns {Promise<number>} The bandwidth cost in SUN.
+     * @param {Transaction<TriggerSmartContract>} transaction - The tron web's transaction.
+     * @param {Object} [options] - The transaction's options.
+     * @returns {Promise<bigint>} The bandwidth cost in SUN.
      */
-    protected _getBandwidthCost(transaction: Transaction<TriggerSmartContract>, { isActivation }?: {
-        isActivation?: boolean;
-    }): Promise<number>;
+    protected _getBandwidthCost(transaction: Transaction<TriggerSmartContract>, options?: { isActivation?: boolean }): Promise<bigint>;
 }
 export type Transaction = import("tronweb").Types.Transaction;
 export type TriggerSmartContract = import("tronweb").Types.TriggerSmartContract;
@@ -108,6 +106,12 @@ export type TronWalletConfig = {
      * - The maximum fee amount for transfer operations.
      */
     transferMaxFee?: number | bigint;
+};
+export type TronActivationFee = {
+    /**
+     * - The portion of the fee used for account activation.
+     */
+    activationFee: bigint;
 };
 import { WalletAccountReadOnly } from '@tetherto/wdk-wallet';
 import { TronWeb } from 'tronweb';

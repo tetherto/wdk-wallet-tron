@@ -36,6 +36,7 @@ import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js'
 
 /** @typedef {import('./wallet-account-read-only-tron.js').TronTransaction} TronTransaction */
 /** @typedef {import('./wallet-account-read-only-tron.js').TronWalletConfig} TronWalletConfig */
+/** @typedef {import('./wallet-account-read-only-tron.js').TronActivationFee} TronActivationFee */
 
 /** @typedef {import('tronweb').Types.SignedTransaction} SignedTransaction */
 
@@ -172,7 +173,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    * Sends a transaction.
    *
    * @param {TronTransaction} tx - The transaction.
-   * @returns {Promise<TransactionResult>} The transaction's result.
+   * @returns {Promise<TransactionResult & TronActivationFee>} The transaction's result.
    */
   async sendTransaction ({ to, value }) {
     if (!this._tronWeb) {
@@ -182,26 +183,26 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
     const address = await this.getAddress()
 
     const transaction = await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
-    const fee = await this._getSendTrxFee(transaction, to)
+    const { fee, activationFee } = await this._getSendTrxFee(to, transaction)
     const signedTransaction = await this._signTransaction(transaction)
 
     const { txid } = await this._tronWeb.trx.sendRawTransaction(signedTransaction)
 
-    return { hash: txid, fee: BigInt(fee) }
+    return { hash: txid, fee, activationFee }
   }
 
   /**
    * Transfers a token to another address.
    *
    * @param {TransferOptions} options - The transfer's options.
-   * @returns {Promise<TransferResult>} The transfer's result.
+   * @returns {Promise<TransferResult & TronActivationFee>} The transfer's result.
    */
   async transfer ({ token, recipient, amount }) {
     if (!this._tronWeb) {
       throw new Error('The wallet must be connected to tron web to transfer tokens.')
     }
 
-    const { fee } = await this.quoteTransfer({ token, recipient, amount })
+    const { fee, activationFee } = await this.quoteTransfer({ token, recipient, amount })
 
     if (this._config.transferMaxFee !== undefined && fee >= this._config.transferMaxFee) {
       throw new Error('Exceeded maximum fee cost for transfer operations.')
@@ -227,7 +228,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
 
     const { txid } = await this._tronWeb.trx.sendRawTransaction(signedTransaction)
 
-    return { hash: txid, fee }
+    return { hash: txid, fee, activationFee }
   }
 
   /**
