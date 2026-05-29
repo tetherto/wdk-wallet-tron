@@ -211,7 +211,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    * @param {Transaction} transaction - The transaction.
    * @returns {Promise<Omit<TransactionResult, 'hash'> & TronActivationFee>} The transaction's fee in SUN.
    */
-  async _getSendTrxFee(to, transaction) {
+  async _getSendTrxFee (to, transaction) {
     const recipientAccount = await this._tronWeb.trx.getAccount(to)
     const isActivation = Object.keys(recipientAccount).length === 0
     const activationFee = isActivation

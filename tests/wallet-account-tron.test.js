@@ -162,10 +162,11 @@ describe('WalletAccountTron', () => {
         NetUsed: 0
       })
 
-      const { hash, fee } = await account.sendTransaction(TRANSACTION)
+      const { hash, fee, activationFee } = await account.sendTransaction(TRANSACTION)
 
       expect(hash).toBe(DUMMY_TX_ID)
       expect(fee).toBe(0n)
+      expect(activationFee).toBe(0n)
 
       expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ACCOUNT.address)
       expect(getAccountMock).toHaveBeenCalledWith(TRANSACTION.to)
@@ -227,10 +228,11 @@ describe('WalletAccountTron', () => {
         { key: 'getEnergyFee', value: 420 }
       ])
 
-      const { hash, fee } = await account.transfer(TRANSFER)
+      const { hash, fee, activationFee } = await account.transfer(TRANSFER)
 
       expect(hash).toBe(DUMMY_TX_ID)
       expect(fee).toBe(4_200_000n)
+      expect(activationFee).toBe(0n)
 
       expect(triggerConstantContractMock).toHaveBeenCalledWith(
         TRANSFER.token,
@@ -244,6 +246,8 @@ describe('WalletAccountTron', () => {
       )
 
       expect(getAccountMock).toHaveBeenCalledWith(TRANSFER.recipient)
+      expect(getAccountResourcesMock).toHaveBeenCalledWith(ACCOUNT.address)
+      expect(getChainParametersMock).toHaveBeenCalled()
 
       expect(triggerSmartContractMock).toHaveBeenCalledWith(
         TRANSFER.token,
