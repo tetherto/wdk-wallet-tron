@@ -246,14 +246,17 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
 
       const failoverProvider = new FailoverProvider({ retries })
 
-      for (const entry of provider) {
-        const option = typeof entry === 'string'
+      const clients = provider.map((entry) => {
+        return typeof entry === 'string'
           ? new TronWeb({ fullHost: entry })
           : entry
-        failoverProvider.addProvider(option)
+      })
+
+      for (const client of clients) {
+        failoverProvider.addProvider(client.fullNode)
       }
 
-      return failoverProvider.initialize()
+      return new TronWeb({ fullHost: failoverProvider.initialize() })
     }
 
     return typeof provider === 'string'
