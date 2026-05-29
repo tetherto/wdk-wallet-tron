@@ -241,7 +241,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
   static initializeProvider (config) {
     const { provider, retries = 3 } = config
 
-    let tronWeb = undefined
+    let tronWeb
 
     if (Array.isArray(provider)) {
       if (!provider.length) return undefined
