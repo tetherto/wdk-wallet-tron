@@ -175,8 +175,22 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     ]
 
     // eslint-disable-next-line camelcase
-    const { transaction, energy_used: energyUsed } = await this._tronWeb.transactionBuilder
-      .triggerConstantContract(token, 'transfer(address,uint256)', {}, parameters, addressHex)
+    let simulation
+    try {
+      simulation = await this._tronWeb.transactionBuilder
+        .triggerConstantContract(token, 'transfer(address,uint256)', {}, parameters, addressHex)
+    } catch (error) {
+      if (error.message?.includes('REVERT')) {
+        const balance = await this.getTokenBalance(token)
+        if (balance < BigInt(amount)) {
+          throw new Error('Insufficient token balance for the transfer.')
+        }
+      }
+
+      throw error
+    }
+
+    const { transaction, energy_used: energyUsed } = simulation
 
     const recipientAccount = await this._tronWeb.trx.getAccount(recipient)
     const isActivation = Object.keys(recipientAccount).length === 0
