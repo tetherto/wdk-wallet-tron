@@ -244,7 +244,9 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     let tronWeb
 
     if (Array.isArray(provider)) {
-      if (!provider.length) return undefined
+      if (!provider.length) {
+        throw new Error("The 'provider' option cannot be set to an empty list.")
+      }
 
       const fullNodeFailover = new FailoverProvider({ retries })
       const solidityNodeFailover = new FailoverProvider({ retries })
