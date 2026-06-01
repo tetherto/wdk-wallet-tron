@@ -51,7 +51,7 @@ jobs:
 
   publish:
     needs: test
-    if: github.repository == 'idyllicvision/wdk-wallet-evm'
+    if: github.repository == 'idyllicvision/wdk-wallet-tron'
     runs-on: ubuntu-latest
     environment: github-packages-publish
     permissions:
@@ -100,7 +100,7 @@ jobs:
           # not propagate $(cmd)'s exit code under pipefail, and $GITHUB_ENV
           # only propagates to subsequent steps — not this same shell.
           VERSION=$(node .github/scripts/compute-next-beta.js \
-            --package-name @idyllicvision/wdk-wallet-evm \
+            --package-name @idyllicvision/wdk-wallet-tron \
             --registry https://npm.pkg.github.com)
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "Publishing version: $VERSION" >> "$GITHUB_STEP_SUMMARY"
@@ -108,10 +108,10 @@ jobs:
       - name: Rewrite package.json for GitHub Packages
         run: |
           node .github/scripts/prepare-package.js \
-            --name @idyllicvision/wdk-wallet-evm \
+            --name @idyllicvision/wdk-wallet-tron \
             --version "$VERSION" \
             --registry https://npm.pkg.github.com \
-            --repository-url git+https://github.com/idyllicvision/wdk-wallet-evm.git
+            --repository-url git+https://github.com/idyllicvision/wdk-wallet-tron.git
 
       # Preflight: exercise the full publish pipeline (manifest validation,
       # tarball assembly, auth, registry endpoint) without mutating the
