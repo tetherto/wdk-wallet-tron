@@ -49,7 +49,7 @@ function getTronAddress (compressedPubKey) {
  * to `WalletAccountTron`, because `WalletAccountTron.constructor` reads
  * `signer.address` synchronously.
  */
-export default class PrivateKeyTronSigner {
+export default class BarePrivateKeyTronSigner {
   /**
    * @param {PrivateKeySignerTronConfig} [config={}]
    */
@@ -139,19 +139,17 @@ export default class PrivateKeyTronSigner {
    * @returns {Promise<string>} Compact hex signature r+s+v (130 chars, no 0x prefix)
    */
   async signTransaction (txID) {
+    if (typeof txID !== 'string' || !/^[0-9a-fA-F]{64}$/.test(txID)) {
+      throw new Error('Invalid txID: expected a 64-character hex string (32 bytes).')
+    }
+
     const txBytes = Buffer.from(txID, 'hex')
 
     const sigBytes = await this._bareSigner.sign({ curve: 'secp256k1', data: txBytes })
 
     // bare-signer returns 65 bytes: [recovery(1), r(32), s(32)]
-    let recovery = sigBytes[0]
-    let sig = secp256k1.Signature.fromBytes(sigBytes.slice(1, 65))
-
-    // Enforce low-S per spec
-    if (sig.hasHighS()) {
-      sig = new secp256k1.Signature(sig.r, secp256k1.Point.Fn.neg(sig.s))
-      recovery ^= 1
-    }
+    const recovery = sigBytes[0]
+    const sig = secp256k1.Signature.fromBytes(sigBytes.slice(1, 65))
 
     const v = (recovery + 27).toString(16).padStart(2, '0')
     return Buffer.from(sig.toBytes()).toString('hex') + v

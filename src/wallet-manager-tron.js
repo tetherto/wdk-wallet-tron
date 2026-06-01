@@ -60,7 +60,7 @@ export default class WalletManagerTron extends WalletManager {
    * @param {string} [signerName='default']
    * @returns {Promise<WalletAccountTron>}
    */
-  async getAccount (index = 0, signerName = 'default') {
+  async getAccount (index = 0, signerName) {
     return this.getAccountByPath(`0'/0/${index}`, signerName)
   }
 
@@ -72,25 +72,24 @@ export default class WalletManagerTron extends WalletManager {
    * const account = await wallet.getAccountByPath("0'/0/1")
    *
    * @param {string} path - Relative path, e.g. "0'/0/0"
-   * @param {string} [signerName='default']
+   * @param {string} [signerName] - Registered signer name; omit for the default signer.
    * @returns {Promise<WalletAccountTron>}
    */
-  async getAccountByPath (path, signerName = 'default') {
-    const key = `${signerName}:${path}`
+  async getAccountByPath (path, signerName) {
+    // The base WalletManager stores accounts/signers as plain objects and keeps
+    // the default signer in `_defaultSigner`; resolve via getSigner() (which
+    // throws for an unknown name) rather than treating them as Maps.
+    const key = `${signerName ?? 'default'}:${path}`
 
-    if (this._accounts.get(key)) {
-      return this._accounts.get(key)
+    if (this._accounts[key]) {
+      return this._accounts[key]
     }
 
-    const signer = this._signers.get(signerName)
-    if (!signer) {
-      throw new Error(`Signer ${signerName} not found.`)
-    }
-
+    const signer = this.getSigner(signerName)
     const child = signer.derive(path)
     const account = new WalletAccountTron(child, this._config)
 
-    this._accounts.set(key, account)
+    this._accounts[key] = account
     return account
   }
 

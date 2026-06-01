@@ -63,7 +63,7 @@ function getTronAddress (compressedPubKey) {
  * to `WalletAccountTron`, because `WalletAccountTron.constructor` reads
  * `signer.address` synchronously.
  */
-export default class TronSigner {
+export default class BareTronSigner {
   /**
    * @param {TronSignerConfig} [config={}]
    */
@@ -92,7 +92,11 @@ export default class TronSigner {
    */
   get index () {
     if (!this._path || this._isRoot) return undefined
-    return +this._path.split('/').pop().replace("'", '')
+    const last = this._path.split('/').pop().replace("'", '')
+    const parsed = Number(last)
+    // Guard against non-numeric last segments (e.g. a malformed path) which
+    // would otherwise yield NaN.
+    return Number.isInteger(parsed) ? parsed : undefined
   }
 
   /** @returns {string} */
@@ -152,7 +156,7 @@ export default class TronSigner {
   /**
    * Derive a child signer using a relative BIP-44 path (e.g. "0'/0/0").
    * @param {string} relPath
-   * @returns {TronSigner}
+   * @returns {BareTronSigner}
    */
   derive (relPath) {
     if (!relPath || typeof relPath !== 'string') {
@@ -160,7 +164,7 @@ export default class TronSigner {
     }
 
     const fullPath = `${BIP44_TRON_PREFIX}/${relPath}`
-    const child = new TronSigner({
+    const child = new BareTronSigner({
       bareSigner: this._bareSigner,
       path: fullPath,
       keychainOpts: this._opts
@@ -211,6 +215,10 @@ export default class TronSigner {
       throw new Error('Cannot sign transactions from a root signer. Derive a child first.')
     }
 
+    if (typeof txID !== 'string' || !/^[0-9a-fA-F]{64}$/.test(txID)) {
+      throw new Error('Invalid txID: expected a 64-character hex string (32 bytes).')
+    }
+
     const txBytes = Buffer.from(txID, 'hex')
 
     const sigBytes = await this._bareSigner.sign({
@@ -221,14 +229,11 @@ export default class TronSigner {
     })
 
     // bare-signer returns 65 bytes: [recovery(1), r(32), s(32)]
-    let recovery = sigBytes[0]
-    let sig = secp256k1.Signature.fromBytes(sigBytes.slice(1, 65))
-
-    // Enforce low-S per spec: if S is high, normalize S = n - S and flip recovery bit
-    if (sig.hasHighS()) {
-      sig = new secp256k1.Signature(sig.r, secp256k1.Point.Fn.neg(sig.s))
-      recovery ^= 1
-    }
+    const recovery = sigBytes[0]
+    // No low-S normalization is needed: the underlying bare-signer uses
+    // @noble/curves, which enforces low-S by default, so the signature is
+    // already canonical.
+    const sig = secp256k1.Signature.fromBytes(sigBytes.slice(1, 65))
 
     const v = (recovery + 27).toString(16).padStart(2, '0')
     return Buffer.from(sig.toBytes()).toString('hex') + v
@@ -244,4 +249,4 @@ export default class TronSigner {
   }
 }
 
-export { TronSigner }
+export { BareTronSigner as TronSigner }

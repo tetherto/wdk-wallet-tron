@@ -19,5 +19,5 @@
  * - `PrivateKeyTronSigner`: private-key based signer via iOS Keychain.
  */
 export { default, default as SeedSignerTron } from './seed-signer-tron.js'
-export { default as TronSigner } from './tron-signer.js'
-export { default as PrivateKeyTronSigner } from './private-key-signer-tron.js'
+export { default as TronSigner } from './bare-tron-signer.js'
+export { default as PrivateKeyTronSigner } from './bare-private-key-signer-tron.js'
