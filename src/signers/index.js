@@ -15,5 +15,9 @@
  * Barrel exports for Tron signers.
  *
  * - `SeedSignerTron`: derives accounts from a BIP-39 seed (BIP-44 m/44'/195' path).
+ * - `TronSigner`: derives accounts from iOS Keychain via bare-universal-signer.
+ * - `PrivateKeyTronSigner`: private-key based signer via iOS Keychain.
  */
 export { default, default as SeedSignerTron } from './seed-signer-tron.js'
+export { default as TronSigner } from './bare-tron-signer.js'
+export { default as PrivateKeyTronSigner } from './bare-private-key-signer-tron.js'
