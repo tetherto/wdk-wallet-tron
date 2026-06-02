@@ -213,8 +213,6 @@ describe('WalletAccountTron', () => {
 
       sendRawTransactionMock.mockResolvedValue({ txid: DUMMY_TX_ID })
 
-      getAccountMock.mockResolvedValue({ address: TRANSFER.recipient })
-
       getAccountResourcesMock.mockResolvedValue({
         freeNetLimit: 5000,
         freeNetUsed: 0,
@@ -232,7 +230,7 @@ describe('WalletAccountTron', () => {
 
       expect(hash).toBe(DUMMY_TX_ID)
       expect(fee).toBe(4_200_000n)
-      expect(activationFee).toBe(0n)
+      expect(activationFee).toBe(undefined)
 
       expect(triggerConstantContractMock).toHaveBeenCalledWith(
         TRANSFER.token,
@@ -245,7 +243,6 @@ describe('WalletAccountTron', () => {
         TronWeb.address.toHex(ACCOUNT.address)
       )
 
-      expect(getAccountMock).toHaveBeenCalledWith(TRANSFER.recipient)
       expect(getAccountResourcesMock).toHaveBeenCalledWith(ACCOUNT.address)
       expect(getChainParametersMock).toHaveBeenCalled()
 

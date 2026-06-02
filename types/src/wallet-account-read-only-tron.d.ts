@@ -50,11 +50,12 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     quoteSendTransaction(tx: TronTransaction): Promise<Omit<TransactionResult, "hash"> & TronActivationFee>;
     /**
      * Quotes the costs of TRC-20 transfer operation.
+     * TRC-20 transfers do not incur an account activation fee.
      *
      * @param {TransferOptions} options - The transfer's options.
-     * @returns {Promise<Omit<TransferResult, 'hash'> & TronActivationFee>} The transfer's quotes.
+     * @returns {Promise<Omit<TransferResult, 'hash'>>} The transfer's quotes.
      */
-    quoteTransfer(options: TransferOptions): Promise<Omit<TransferResult, "hash"> & TronActivationFee>;
+    quoteTransfer(options: TransferOptions): Promise<Omit<TransferResult, "hash">>;
     /**
      * Returns the fee of a send transaction operation.
      *
