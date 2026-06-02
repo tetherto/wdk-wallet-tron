@@ -16,6 +16,8 @@
 
 import { WalletAccountReadOnly } from '@tetherto/wdk-wallet'
 
+import FailoverProvider from '@tetherto/wdk-failover-provider'
+
 import { TronWeb, Trx } from 'tronweb'
 
 /** @typedef {import('tronweb').Types.Transaction} Transaction */
@@ -34,7 +36,8 @@ import { TronWeb, Trx } from 'tronweb'
 
 /**
  * @typedef {Object} TronWalletConfig
- * @property {string | TronWeb} [provider] - The url of the tron web provider, or an instance of the {@link TronWeb} class.
+ * @property {string | TronWeb | Array<string | TronWeb>} [provider] - The url of the tron web provider, or an instance of the {@link TronWeb} class. It's also possible to provide a list of urls or {@link TronWeb} instances instead. In such case, connection errors will cause the wallet to automatically fallback on the next provider in the list. When passing {@link TronWeb} instances, the first one becomes the wallet's primary client; the others contribute only their `fullNode` / `solidityNode` / `eventServer` to the failover pool.
+ * @property {number} [retries] - If set and if 'provider' is a list of urls or {@link TronWeb} instances, the number of additional retry attempts after the initial call fails. Total attempts = `1 + retries`. For example, `retries: 3` with 4 providers will try each provider once before throwing. If `retries` exceeds the number of providers, the failover will loop back and retry already-failed providers in round-robin order. Default: 3.
  * @property {number | bigint} [transferMaxFee] - The maximum fee amount for transfer operations.
  */
 
@@ -69,7 +72,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    * @param {string} address - The account's address.
    * @param {Omit<TronWalletConfig, 'transferMaxFee'>} [config] - The configuration object.
    */
-  constructor (address, config = { }) {
+  constructor (address, config = {}) {
     super(address)
 
     /**
@@ -80,19 +83,13 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      */
     this._config = config
 
-    const { provider } = config
-
-    if (provider) {
-      /**
-       * The tron web client.
-       *
-       * @protected
-       * @type {TronWeb | undefined}
-       */
-      this._tronWeb = typeof provider === 'string'
-        ? new TronWeb({ fullHost: provider })
-        : provider
-    }
+    /**
+     * The tron web client.
+     *
+     * @protected
+     * @type {TronWeb | undefined}
+     */
+    this._tronWeb = WalletAccountReadOnlyTron.initializeProvider(config)
   }
 
   /**
@@ -302,5 +299,58 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     }
 
     return txSizeInBytes * BANDWIDTH_PRICE
+  }
+
+  /**
+   * Initializes the tron web provider with optional failover support.
+   *
+   * @param {Omit<TronWalletConfig, 'transferMaxFee'>} config - The read-only wallet account configuration.
+   * @returns {TronWeb | undefined} The initialized tron web provider.
+   */
+  static initializeProvider (config) {
+    const { provider, retries = 3 } = config
+
+    let tronWeb
+
+    if (Array.isArray(provider)) {
+      if (!provider.length) {
+        throw new Error("The 'provider' option cannot be set to an empty list.")
+      }
+
+      const fullNodeFailover = new FailoverProvider({ retries })
+      const solidityNodeFailover = new FailoverProvider({ retries })
+      const eventServerFailover = new FailoverProvider({ retries })
+
+      const clients = provider.map((entry) => {
+        if (typeof entry === 'string') {
+          return new TronWeb({ fullHost: entry })
+        }
+
+        if (!tronWeb) tronWeb = entry
+        return entry
+      })
+
+      for (const client of clients) {
+        fullNodeFailover.addProvider(client.fullNode)
+        solidityNodeFailover.addProvider(client.solidityNode)
+        eventServerFailover.addProvider(client.eventServer)
+      }
+
+      const fullNode = fullNodeFailover.initialize()
+      const solidityNode = solidityNodeFailover.initialize()
+      const eventServer = eventServerFailover.initialize()
+
+      if (!tronWeb) return new TronWeb({ fullNode, solidityNode, eventServer })
+
+      tronWeb.setFullNode(fullNode)
+      tronWeb.setSolidityNode(solidityNode)
+      tronWeb.setEventServer(eventServer)
+
+      return tronWeb
+    }
+
+    return typeof provider === 'string'
+      ? new TronWeb({ fullHost: provider })
+      : provider
   }
 }

@@ -49,6 +49,7 @@ wallet.dispose()
 - **Message Signing**: Sign messages and verify signatures with TRON accounts
 - **Fee Estimation**: Retrieve current network fee rates and quote transaction costs
 - **Read-Only Accounts**: Monitor any TRON address without a private key
+- **Failover Providers**: Pass an array of provider URLs to enable automatic round-robin failover
 - **Secure Memory Disposal**: Clear private keys from memory when done
 
 ## Compatibility

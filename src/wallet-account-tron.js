@@ -123,11 +123,15 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
   /**
    * The account's key pair.
    *
+   * The uint8 arrays are bound to the wallet account, so any external change will reflect to the internal representation. For this reason,
+   * it's strongly recommended to treat the key pair as a read-only view of the keys. While it's still technically possible to alter their
+   * content, client code should never do so.
+   *
    * @type {KeyPair}
    */
   get keyPair () {
     return {
-      privateKey: this._account.privateKey,
+      privateKey: this._account.privateKey ?? null,
       publicKey: this._account.publicKey
     }
   }

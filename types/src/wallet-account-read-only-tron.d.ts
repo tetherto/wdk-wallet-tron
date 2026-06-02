@@ -81,6 +81,13 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      * @returns {Promise<bigint>} The bandwidth cost in SUN.
      */
     protected _getBandwidthCost(transaction: Transaction<TriggerSmartContract>, options?: { isActivation?: boolean }): Promise<bigint>;
+    /**
+     * Initializes the tron web provider with optional failover support.
+     *
+     * @param {Omit<TronWalletConfig, 'transferMaxFee'>} config - The read-only wallet account configuration.
+     * @returns {TronWeb | undefined} The initialized tron web provider.
+     */
+    static initializeProvider(config: Omit<TronWalletConfig, "transferMaxFee">): TronWeb | undefined;
 }
 export type Transaction = import("tronweb").Types.Transaction;
 export type TriggerSmartContract = import("tronweb").Types.TriggerSmartContract;
@@ -100,9 +107,13 @@ export type TronTransaction = {
 };
 export type TronWalletConfig = {
     /**
-     * - The url of the tron web provider, or an instance of the {@link TronWeb} class.
+     * - The url of the tron web provider, or an instance of the {@link TronWeb} class. It's also possible to provide a list of urls or {@link TronWeb} instances instead. In such case, connection errors will cause the wallet to automatically fallback on the next provider in the list.
      */
-    provider?: string | TronWeb;
+    provider?: string | TronWeb | Array<string | TronWeb>;
+    /**
+     * - If set and if 'provider' is a list of urls or {@link TronWeb} instances, the number of additional retry attempts after the initial call fails. Total attempts = `1 + retries`. For example, `retries: 3` with 4 providers will try each provider once before throwing. If `retries` exceeds the number of providers, the failover will loop back and retry already-failed providers in round-robin order. Default: 3.
+     */
+    retries?: number;
     /**
      * - The maximum fee amount for transfer operations.
      */
