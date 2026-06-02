@@ -192,19 +192,20 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
   }
 
   /**
-   * Transfers a token to another address.
+   * Transfers a TRC-20 token to another address.
+   * TRC-20 transfers do not incur an account activation fee.
    *
    * @param {TransferOptions} options - The transfer's options.
-   * @returns {Promise<TransferResult & TronActivationFee>} The transfer's result.
+   * @returns {Promise<TransferResult>} The transfer's result.
    */
   async transfer ({ token, recipient, amount }) {
     if (!this._tronWeb) {
       throw new Error('The wallet must be connected to tron web to transfer tokens.')
     }
 
-    const { fee, activationFee } = await this.quoteTransfer({ token, recipient, amount })
+    const { fee } = await this.quoteTransfer({ token, recipient, amount })
 
-    if (this._config.transferMaxFee !== undefined && fee >= this._config.transferMaxFee) {
+    if (this._config.transferMaxFee !== undefined && fee >= BigInt(this._config.transferMaxFee)) {
       throw new Error('Exceeded maximum fee cost for transfer operations.')
     }
 
@@ -228,7 +229,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
 
     const { txid } = await this._tronWeb.trx.sendRawTransaction(signedTransaction)
 
-    return { hash: txid, fee, activationFee }
+    return { hash: txid, fee }
   }
 
   /**

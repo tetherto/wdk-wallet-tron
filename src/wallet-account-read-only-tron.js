@@ -45,10 +45,22 @@ import { TronWeb, Trx } from 'tronweb'
 
 const BANDWIDTH_PRICE = 1_000n
 const ACCOUNT_ACTIVATION_FEE_SUN = 1_000_000n
-const ACCOUNT_ACTIVATION_FEE_ENERGY = 25_000n
 const ACCOUNT_ACTIVATION_BANDWIDTH_COST = 100_000n
+/**
+ * The length of an ECDSA signature in bytes.
+ */
 const SIGNATURE_LENGTH_IN_BYTES = 65
+/**
+ * A fixed overhead added by the TRON protocol to account for the transaction result
+ * (MAX_RESULT_SIZE_IN_TX). Defined as 64 bytes.
+ */
 const TRANSACTION_RESULT_OVERHEAD_IN_BYTES = 64
+/**
+ * The approximate Protobuf overhead for the transaction envelope.
+ * We use a generous value of 15 bytes to ensure we favor overestimation
+ * (which is safer for fee limits) rather than underestimation.
+ */
+const PROTOBUF_OVERHEAD_IN_BYTES = 15
 
 export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
   /**
@@ -158,9 +170,10 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
 
   /**
    * Quotes the costs of TRC-20 transfer operation.
+   * TRC-20 transfers do not incur an account activation fee.
    *
    * @param {TransferOptions} options - The transfer's options.
-   * @returns {Promise<Omit<TransferResult, 'hash'> & TronActivationFee>} The transfer's quotes.
+   * @returns {Promise<Omit<TransferResult, 'hash'>>} The transfer's quotes.
    */
   async quoteTransfer ({ token, recipient, amount }) {
     if (!this._tronWeb) {
@@ -175,7 +188,6 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
       { type: 'uint256', value: amount }
     ]
 
-    // eslint-disable-next-line camelcase
     let simulation
     try {
       simulation = await this._tronWeb.transactionBuilder
@@ -193,28 +205,24 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
 
     const { transaction, energy_used: energyUsed } = simulation
 
-    const recipientAccount = await this._tronWeb.trx.getAccount(recipient)
-    const isActivation = Object.keys(recipientAccount).length === 0
+    const [chainParameters, resources] = await Promise.all([
+      this._tronWeb.trx.getChainParameters(),
+      this._tronWeb.trx.getAccountResources(address)
+    ])
 
-    const chainParameters = await this._tronWeb.trx.getChainParameters()
     const { value: energyPrice } = chainParameters.find(({ key }) => key === 'getEnergyFee')
 
-    const resources = await this._tronWeb.trx.getAccountResources(address)
     const availableEnergy = BigInt(resources.EnergyLimit || 0) - BigInt(resources.EnergyUsed || 0)
 
+    // We ignore contract-level sponsorship (consume_user_resource_percent) as it depends
+    // on real-time factors, ensuring our fee estimate remains the safest.
     const energyNeeded = BigInt(energyUsed) - availableEnergy
-    const baseEnergyCost = energyNeeded > 0n ? energyNeeded * BigInt(energyPrice) : 0n
-
-    const totalEnergyNeeded = isActivation
-      ? BigInt(energyUsed) + ACCOUNT_ACTIVATION_FEE_ENERGY - availableEnergy
-      : energyNeeded
-    const totalEnergyCost = totalEnergyNeeded > 0n ? totalEnergyNeeded * BigInt(energyPrice) : 0n
+    const totalEnergyCost = energyNeeded > 0n ? energyNeeded * BigInt(energyPrice) : 0n
 
     const bandwidthCost = await this._getBandwidthCost(transaction, { isActivation: false })
 
     return {
-      fee: totalEnergyCost + bandwidthCost,
-      activationFee: totalEnergyCost - baseEnergyCost
+      fee: totalEnergyCost + bandwidthCost
     }
   }
 
@@ -272,8 +280,8 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
   async _getBandwidthCost (transaction, { isActivation } = {}) {
     const rawDataHex = transaction.raw_data_hex
     // Each hex character represents half a byte. We add the signature length (65 bytes),
-    // the transaction result overhead (64 bytes), and approximately 5 bytes of Protobuf overhead for the transaction envelope.
-    const txSizeInBytes = BigInt(Math.ceil(rawDataHex.length / 2) + SIGNATURE_LENGTH_IN_BYTES + TRANSACTION_RESULT_OVERHEAD_IN_BYTES + 5)
+    // the transaction result overhead (64 bytes), and the Protobuf overhead for the transaction envelope.
+    const txSizeInBytes = BigInt(Math.ceil(rawDataHex.length / 2) + SIGNATURE_LENGTH_IN_BYTES + TRANSACTION_RESULT_OVERHEAD_IN_BYTES + PROTOBUF_OVERHEAD_IN_BYTES)
 
     const address = await this.getAddress()
     const resources = await this._tronWeb.trx.getAccountResources(address)
