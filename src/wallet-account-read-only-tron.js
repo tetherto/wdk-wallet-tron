@@ -48,6 +48,7 @@ const ACCOUNT_ACTIVATION_FEE_SUN = 1_000_000n
 const ACCOUNT_ACTIVATION_FEE_ENERGY = 25_000n
 const ACCOUNT_ACTIVATION_BANDWIDTH_COST = 100_000n
 const SIGNATURE_LENGTH_IN_BYTES = 65
+const TRANSACTION_RESULT_OVERHEAD_IN_BYTES = 64
 
 export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
   /**
@@ -270,9 +271,9 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    */
   async _getBandwidthCost (transaction, { isActivation } = {}) {
     const rawDataHex = transaction.raw_data_hex
-    // Each hex character represents half a byte. We add the signature length (65 bytes)
-    // plus approximately 5 bytes of Protobuf overhead for the transaction envelope.
-    const txSizeInBytes = BigInt(Math.ceil(rawDataHex.length / 2) + SIGNATURE_LENGTH_IN_BYTES + 5)
+    // Each hex character represents half a byte. We add the signature length (65 bytes),
+    // the transaction result overhead (64 bytes), and approximately 5 bytes of Protobuf overhead for the transaction envelope.
+    const txSizeInBytes = BigInt(Math.ceil(rawDataHex.length / 2) + SIGNATURE_LENGTH_IN_BYTES + TRANSACTION_RESULT_OVERHEAD_IN_BYTES + 5)
 
     const address = await this.getAddress()
     const resources = await this._tronWeb.trx.getAccountResources(address)
