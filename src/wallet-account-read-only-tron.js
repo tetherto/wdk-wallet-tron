@@ -21,7 +21,6 @@ import FailoverProvider from '@tetherto/wdk-failover-provider'
 import { TronWeb, Trx } from 'tronweb'
 
 /** @typedef {import('tronweb').Types.Transaction} Transaction */
-/** @typedef {import('tronweb').Types.TriggerSmartContract} TriggerSmartContract */
 /** @typedef {import('tronweb').Types.TransactionInfo} TronTransactionReceipt */
 
 /** @typedef {import('@tetherto/wdk-wallet').TransactionResult} TransactionResult */
@@ -213,10 +212,10 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
 
     // We ignore contract-level sponsorship (consume_user_resource_percent) as it depends
     // on real-time factors, ensuring our fee estimate remains the safest.
-    const energyNeeded = BigInt(energyUsed) - availableEnergy
+    const energyNeeded = BigInt(energyUsed || 0n) - availableEnergy
     const totalEnergyCost = energyNeeded > 0n ? energyNeeded * BigInt(energyPrice) : 0n
 
-    const bandwidthCost = await this._getBandwidthCost(transaction, { isActivation: false })
+    const bandwidthCost = await this._getBandwidthCost(transaction, { isActivation: false, resources })
 
     return {
       fee: totalEnergyCost + bandwidthCost
@@ -270,18 +269,18 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    * Returns the bandwidth cost of a tron web's transaction.
    *
    * @protected
-   * @param {Transaction<TriggerSmartContract>} transaction - The tron web's transaction.
+   * @param {Transaction} transaction - The tron web's transaction.
    * @param {Object} [options] - The transaction's options.
    * @returns {Promise<bigint>} The bandwidth cost in SUN.
    */
-  async _getBandwidthCost (transaction, { isActivation } = {}) {
+  async _getBandwidthCost (transaction, { isActivation, resources: cachedResources } = {}) {
     const rawDataHex = transaction.raw_data_hex
     // Each hex character represents half a byte. We add the signature length (65 bytes),
     // the transaction result overhead (64 bytes), and the Protobuf overhead for the transaction envelope.
     const txSizeInBytes = BigInt(Math.ceil(rawDataHex.length / 2) + SIGNATURE_LENGTH_IN_BYTES + TRANSACTION_RESULT_OVERHEAD_IN_BYTES + PROTOBUF_OVERHEAD_IN_BYTES)
 
     const address = await this.getAddress()
-    const resources = await this._tronWeb.trx.getAccountResources(address)
+    const resources = cachedResources ?? await this._tronWeb.trx.getAccountResources(address)
 
     const freeBandwidthLeft = BigInt(resources.freeNetLimit || 0) - BigInt(resources.freeNetUsed || 0)
     const frozenBandwidthLeft = BigInt(resources.NetLimit || 0) - BigInt(resources.NetUsed || 0)

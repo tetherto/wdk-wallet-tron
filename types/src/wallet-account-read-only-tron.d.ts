@@ -76,11 +76,11 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      * Returns the bandwidth cost of a tron web's transaction.
      *
      * @protected
-     * @param {Transaction<TriggerSmartContract>} transaction - The tron web's transaction.
+     * @param {Transaction} transaction - The tron web's transaction.
      * @param {Object} [options] - The transaction's options.
      * @returns {Promise<bigint>} The bandwidth cost in SUN.
      */
-    protected _getBandwidthCost(transaction: Transaction<TriggerSmartContract>, options?: { isActivation?: boolean }): Promise<bigint>;
+    protected _getBandwidthCost(transaction: Transaction, options?: { isActivation?: boolean; resources?: object }): Promise<bigint>;
     /**
      * Initializes the tron web provider with optional failover support.
      *
@@ -90,7 +90,6 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     static initializeProvider(config: Omit<TronWalletConfig, "transferMaxFee">): TronWeb | undefined;
 }
 export type Transaction = import("tronweb").Types.Transaction;
-export type TriggerSmartContract = import("tronweb").Types.TriggerSmartContract;
 export type TronTransactionReceipt = import("tronweb").Types.TransactionInfo;
 export type TransactionResult = import("@tetherto/wdk-wallet").TransactionResult;
 export type TransferOptions = import("@tetherto/wdk-wallet").TransferOptions;
@@ -107,7 +106,7 @@ export type TronTransaction = {
 };
 export type TronWalletConfig = {
     /**
-     * - The url of the tron web provider, or an instance of the {@link TronWeb} class. It's also possible to provide a list of urls or {@link TronWeb} instances instead. In such case, connection errors will cause the wallet to automatically fallback on the next provider in the list.
+     * - The url of the tron web provider, or an instance of the {@link TronWeb} class. It's also possible to provide a list of urls or {@link TronWeb} instances instead. In such case, connection errors will cause the wallet to automatically fallback on the next provider in the list. When passing {@link TronWeb} instances, the first one becomes the wallet's primary client; the others contribute only their `fullNode` / `solidityNode` / `eventServer` to the failover pool.
      */
     provider?: string | TronWeb | Array<string | TronWeb>;
     /**

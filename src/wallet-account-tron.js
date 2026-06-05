@@ -41,6 +41,7 @@ import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js'
 /** @typedef {import('tronweb').Types.SignedTransaction} SignedTransaction */
 
 const BIP_44_TRON_DERIVATION_PATH_PREFIX = "m/44'/195'"
+const DEFAULT_FEE_LIMIT_SUN = 15_000_000
 
 function getTronAddress (publicKey) {
   const uncompressedPublicKey = secp256k1.Point.fromHex(publicKey)
@@ -217,7 +218,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
     const addressHex = this._tronWeb.address.toHex(address)
 
     const options = {
-      feeLimit: Number(fee),
+      feeLimit: Number(fee) || DEFAULT_FEE_LIMIT_SUN,
       callValue: 0
     }
 
