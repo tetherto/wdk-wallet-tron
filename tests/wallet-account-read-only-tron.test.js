@@ -345,6 +345,43 @@ describe('WalletAccountReadOnlyTron', () => {
       expect(activationFee).toBe(undefined)
     })
 
+    test('should throw "Insufficient token balance" when simulation reverts and balance is below the transfer amount', async () => {
+      const TRANSFER = {
+        token: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+        recipient: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
+        amount: 100_000_000
+      }
+
+      // transfer simulation reverts
+      triggerConstantContractMock.mockRejectedValueOnce(new Error('REVERT opcode'))
+      // balanceOf returns 50_000_000 (0x02faf080) — below the transfer amount
+      triggerConstantContractMock.mockResolvedValueOnce({
+        constant_result: ['0000000000000000000000000000000000000000000000000000000002faf080']
+      })
+
+      await expect(account.quoteTransfer(TRANSFER))
+        .rejects.toThrow('Insufficient token balance for the transfer.')
+    })
+
+    test('should rethrow the original error when simulation reverts but balance is sufficient', async () => {
+      const TRANSFER = {
+        token: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+        recipient: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
+        amount: 100_000_000
+      }
+
+      const originalError = new Error('REVERT opcode')
+
+      // transfer simulation reverts
+      triggerConstantContractMock.mockRejectedValueOnce(originalError)
+      // balanceOf returns 200_000_000 (0x0bebc200) — above the transfer amount
+      triggerConstantContractMock.mockResolvedValueOnce({
+        constant_result: ['000000000000000000000000000000000000000000000000000000000bebc200']
+      })
+
+      await expect(account.quoteTransfer(TRANSFER)).rejects.toBe(originalError)
+    })
+
     test('should throw if the account is not connected to tron web', async () => {
       const disconnectedAccount = new WalletAccountReadOnlyTron(ADDRESS)
       await expect(disconnectedAccount.quoteTransfer({
