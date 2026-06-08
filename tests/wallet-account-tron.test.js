@@ -112,6 +112,34 @@ describe('WalletAccountTron', () => {
   })
 
   describe('signTransaction', () => {
+    test('should throw if transaction fee exceeds the transaction max fee configuration', async () => {
+      const TRANSACTION = {
+        to: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
+        value: 1_000_000
+      }
+      const DUMMY_SEND_TRX_RESULT = {
+        txID: '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f',
+        raw_data_hex: '0a' + '00'.repeat(100)
+      }
+
+      sendTrxMock.mockResolvedValue(DUMMY_SEND_TRX_RESULT)
+
+      getAccountResourcesMock.mockResolvedValue({
+        freeNetLimit: 5000,
+        freeNetUsed: 0,
+        NetLimit: 0,
+        NetUsed: 0
+      })
+
+      const accountWithMaxFee = new WalletAccountTron(SEED_PHRASE, "0'/0/0", {
+        provider: 'https://tron.web.provider/',
+        transactionMaxFee: 0
+      })
+
+      await expect(accountWithMaxFee.signTransaction(TRANSACTION))
+        .rejects.toThrow('Exceeded maximum fee cost for transaction operation.')
+    })
+
     test('should sign a transaction and return the signed tx', async () => {
       const TRANSACTION = {
         to: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
@@ -169,6 +197,34 @@ describe('WalletAccountTron', () => {
         signature: [EXPECTED_SIGNATURE]
       })
       expect(getAccountResourcesMock).toHaveBeenCalledWith(ACCOUNT.address)
+    })
+
+    test('should throw if transaction fee exceeds the transaction max fee configuration', async () => {
+      const TRANSACTION = {
+        to: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
+        value: 1_000_000
+      }
+      const DUMMY_SEND_TRX_RESULT = {
+        txID: '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f',
+        raw_data_hex: '0a' + '00'.repeat(100)
+      }
+
+      sendTrxMock.mockResolvedValue(DUMMY_SEND_TRX_RESULT)
+
+      getAccountResourcesMock.mockResolvedValue({
+        freeNetLimit: 5000,
+        freeNetUsed: 0,
+        NetLimit: 0,
+        NetUsed: 0
+      })
+
+      const accountWithMaxFee = new WalletAccountTron(SEED_PHRASE, "0'/0/0", {
+        provider: 'https://tron.web.provider/',
+        transactionMaxFee: 0
+      })
+
+      await expect(accountWithMaxFee.sendTransaction(TRANSACTION))
+        .rejects.toThrow('Exceeded maximum fee cost for transaction operation.')
     })
 
     test('should throw if the account is not connected to tron web', async () => {
