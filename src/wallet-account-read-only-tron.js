@@ -21,6 +21,7 @@ import FailoverProvider from '@tetherto/wdk-failover-provider'
 import { TronWeb, Trx } from 'tronweb'
 
 /** @typedef {import('tronweb').Types.Transaction} Transaction */
+/** @typedef {import('tronweb').Types.AccountResourceMessage} AccountResourceMessage */
 /** @typedef {import('tronweb').Types.TransactionInfo} TronTransactionReceipt */
 
 /** @typedef {import('@tetherto/wdk-wallet').TransactionResult} TransactionResult */
@@ -43,6 +44,12 @@ import { TronWeb, Trx } from 'tronweb'
 /**
  * @typedef {Object} TronActivationFee
  * @property {bigint} activationFee - The portion of the fee used for account activation.
+ */
+
+/**
+ * @typedef {Object} TronBandwidthCostOptions
+ * @property {boolean} [isActivation] - Whether the transaction activates a new recipient account.
+ * @property {AccountResourceMessage} [resources] - Resource snapshot returned by `getAccountResources` for the sender.
  */
 
 const BANDWIDTH_PRICE = 1_000n
@@ -270,7 +277,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    *
    * @protected
    * @param {Transaction} transaction - The tron web's transaction.
-   * @param {Object} [options] - The transaction's options.
+   * @param {TronBandwidthCostOptions} [options] - Bandwidth calculation options.
    * @returns {Promise<bigint>} The bandwidth cost in SUN.
    */
   async _getBandwidthCost (transaction, { isActivation, resources: cachedResources } = {}) {

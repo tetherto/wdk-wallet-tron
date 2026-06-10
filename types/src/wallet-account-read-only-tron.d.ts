@@ -77,10 +77,10 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      *
      * @protected
      * @param {Transaction} transaction - The tron web's transaction.
-     * @param {Object} [options] - The transaction's options.
+     * @param {TronBandwidthCostOptions} [options] - Bandwidth calculation options.
      * @returns {Promise<bigint>} The bandwidth cost in SUN.
      */
-    protected _getBandwidthCost(transaction: Transaction, options?: { isActivation?: boolean; resources?: object }): Promise<bigint>;
+    protected _getBandwidthCost(transaction: Transaction, options?: TronBandwidthCostOptions): Promise<bigint>;
     /**
      * Initializes the tron web provider with optional failover support.
      *
@@ -90,6 +90,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     static initializeProvider(config: Omit<TronWalletConfig, "transferMaxFee">): TronWeb | undefined;
 }
 export type Transaction = import("tronweb").Types.Transaction;
+export type AccountResourceMessage = import("tronweb").Types.AccountResourceMessage;
 export type TronTransactionReceipt = import("tronweb").Types.TransactionInfo;
 export type TransactionResult = import("@tetherto/wdk-wallet").TransactionResult;
 export type TransferOptions = import("@tetherto/wdk-wallet").TransferOptions;
@@ -123,6 +124,16 @@ export type TronActivationFee = {
      * - The portion of the fee used for account activation.
      */
     activationFee: bigint;
+};
+export type TronBandwidthCostOptions = {
+    /**
+     * - Whether the transaction activates a new recipient account.
+     */
+    isActivation?: boolean;
+    /**
+     * - Resource snapshot returned by `getAccountResources` for the sender.
+     */
+    resources?: AccountResourceMessage;
 };
 import { WalletAccountReadOnly } from '@tetherto/wdk-wallet';
 import { TronWeb } from 'tronweb';

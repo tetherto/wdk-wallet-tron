@@ -250,6 +250,7 @@ describe('WalletAccountReadOnlyTron', () => {
         recipient: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
         amount: 100_000_000
       }
+      const EXPECTED_FEE = 0n
 
       triggerConstantContractMock.mockResolvedValue({
         constant_result: ['0000000000000000000000000000000000000000000000000000000000000064'],
@@ -288,7 +289,7 @@ describe('WalletAccountReadOnlyTron', () => {
       expect(getAccountResourcesMock).toHaveBeenCalledWith(ADDRESS)
       expect(getChainParametersMock).toHaveBeenCalled()
 
-      expect(typeof fee).toBe('bigint')
+      expect(fee).toBe(EXPECTED_FEE)
       expect(activationFee).toBe(undefined)
     })
 
@@ -361,6 +362,26 @@ describe('WalletAccountReadOnlyTron', () => {
 
       await expect(account.quoteTransfer(TRANSFER))
         .rejects.toThrow('Insufficient token balance for the transfer.')
+
+      expect(triggerConstantContractMock).toHaveBeenNthCalledWith(
+        1,
+        TRANSFER.token,
+        'transfer(address,uint256)',
+        {},
+        [
+          { type: 'address', value: TronWeb.address.toHex(TRANSFER.recipient) },
+          { type: 'uint256', value: TRANSFER.amount }
+        ],
+        TronWeb.address.toHex(ADDRESS)
+      )
+      expect(triggerConstantContractMock).toHaveBeenNthCalledWith(
+        2,
+        TRANSFER.token,
+        'balanceOf(address)',
+        {},
+        [{ type: 'address', value: TronWeb.address.toHex(ADDRESS) }],
+        TronWeb.address.toHex(ADDRESS)
+      )
     })
 
     test('should rethrow the original error when simulation reverts but balance is sufficient', async () => {
@@ -380,6 +401,26 @@ describe('WalletAccountReadOnlyTron', () => {
       })
 
       await expect(account.quoteTransfer(TRANSFER)).rejects.toBe(originalError)
+
+      expect(triggerConstantContractMock).toHaveBeenNthCalledWith(
+        1,
+        TRANSFER.token,
+        'transfer(address,uint256)',
+        {},
+        [
+          { type: 'address', value: TronWeb.address.toHex(TRANSFER.recipient) },
+          { type: 'uint256', value: TRANSFER.amount }
+        ],
+        TronWeb.address.toHex(ADDRESS)
+      )
+      expect(triggerConstantContractMock).toHaveBeenNthCalledWith(
+        2,
+        TRANSFER.token,
+        'balanceOf(address)',
+        {},
+        [{ type: 'address', value: TronWeb.address.toHex(ADDRESS) }],
+        TronWeb.address.toHex(ADDRESS)
+      )
     })
 
     test('should throw if the account is not connected to tron web', async () => {
