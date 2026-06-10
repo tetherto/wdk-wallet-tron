@@ -21,7 +21,7 @@ import FailoverProvider from '@tetherto/wdk-failover-provider'
 import { TronWeb, Trx } from 'tronweb'
 
 /** @typedef {import('tronweb').Types.Transaction} Transaction */
-/** @typedef {import('tronweb').Types.TriggerSmartContract} TriggerSmartContract */
+/** @typedef {import('tronweb').Types.AccountResourceMessage} AccountResourceMessage */
 /** @typedef {import('tronweb').Types.TransactionInfo} TronTransactionReceipt */
 
 /** @typedef {import('@tetherto/wdk-wallet').TransactionResult} TransactionResult */
@@ -41,7 +41,35 @@ import { TronWeb, Trx } from 'tronweb'
  * @property {number | bigint} [transferMaxFee] - The maximum fee amount for transfer operations.
  */
 
-const BANDWIDTH_PRICE = 1_000
+/**
+ * @typedef {Object} TronActivationFee
+ * @property {bigint} activationFee - The portion of the fee used for account activation.
+ */
+
+/**
+ * @typedef {Object} TronBandwidthCostOptions
+ * @property {boolean} [isActivation] - Whether the transaction activates a new recipient account.
+ * @property {AccountResourceMessage} [resources] - Resource snapshot returned by `getAccountResources` for the sender.
+ */
+
+const BANDWIDTH_PRICE = 1_000n
+const ACCOUNT_ACTIVATION_FEE_SUN = 1_000_000n
+const ACCOUNT_ACTIVATION_BANDWIDTH_COST = 100_000n
+/**
+ * The length of an ECDSA signature in bytes.
+ */
+const SIGNATURE_LENGTH_IN_BYTES = 65
+/**
+ * A fixed overhead added by the TRON protocol to account for the transaction result
+ * (MAX_RESULT_SIZE_IN_TX). Defined as 64 bytes.
+ */
+const TRANSACTION_RESULT_OVERHEAD_IN_BYTES = 64
+/**
+ * The approximate Protobuf overhead for the transaction envelope.
+ * We use a generous value of 15 bytes to ensure we favor overestimation
+ * (which is safer for fee limits) rather than underestimation.
+ */
+const PROTOBUF_OVERHEAD_IN_BYTES = 15
 
 export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
   /**
@@ -129,7 +157,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    * Quotes the costs of a send transaction operation.
    *
    * @param {TronTransaction} tx - The transaction.
-   * @returns {Promise<Omit<TransactionResult, 'hash'>>} The transaction's quotes.
+   * @returns {Promise<Omit<TransactionResult, 'hash'> & TronActivationFee>} The transaction's quotes.
    */
   async quoteSendTransaction ({ to, value }) {
     if (!this._tronWeb) {
@@ -139,13 +167,13 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     const address = await this.getAddress()
 
     const transaction = await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
-    const fee = await this._getBandwidthCost(transaction)
 
-    return { fee: BigInt(fee) }
+    return await this._getSendTrxFee(to, transaction)
   }
 
   /**
-   * Quotes the costs of transfer operation.
+   * Quotes the costs of TRC-20 transfer operation.
+   * TRC-20 transfers do not incur an account activation fee.
    *
    * @param {TransferOptions} options - The transfer's options.
    * @returns {Promise<Omit<TransferResult, 'hash'>>} The transfer's quotes.
@@ -163,24 +191,65 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
       { type: 'uint256', value: amount }
     ]
 
-    // eslint-disable-next-line camelcase
-    const { transaction, energy_used } = await this._tronWeb.transactionBuilder
-      .triggerConstantContract(token, 'transfer(address,uint256)', {}, parameters, addressHex)
+    let simulation
+    try {
+      simulation = await this._tronWeb.transactionBuilder
+        .triggerConstantContract(token, 'transfer(address,uint256)', {}, parameters, addressHex)
+    } catch (error) {
+      if (error.message?.includes('REVERT')) {
+        const balance = await this.getTokenBalance(token)
+        if (balance < BigInt(amount)) {
+          throw new Error('Insufficient token balance for the transfer.')
+        }
+      }
 
-    const chainParameters = await this._tronWeb.trx.getChainParameters()
-    const { value } = chainParameters.find(({ key }) => key === 'getEnergyFee')
+      throw error
+    }
 
-    const resources = await this._tronWeb.trx.getAccountResources(address)
-    const availableEnergy = (resources.EnergyLimit || 0) - (resources.EnergyUsed || 0)
+    const { transaction, energy_used: energyUsed } = simulation
 
-    // eslint-disable-next-line camelcase
-    const energyCost = availableEnergy < energy_used ? Math.ceil(energy_used * value) : 0
+    const [chainParameters, resources] = await Promise.all([
+      this._tronWeb.trx.getChainParameters(),
+      this._tronWeb.trx.getAccountResources(address)
+    ])
 
-    const bandwidthCost = await this._getBandwidthCost(transaction)
+    const { value: energyPrice } = chainParameters.find(({ key }) => key === 'getEnergyFee')
 
-    const fee = energyCost + bandwidthCost
+    const availableEnergy = BigInt(resources.EnergyLimit || 0) - BigInt(resources.EnergyUsed || 0)
 
-    return { fee: BigInt(fee) }
+    // We ignore contract-level sponsorship (consume_user_resource_percent) as it depends
+    // on real-time factors, ensuring our fee estimate remains the safest.
+    const energyNeeded = BigInt(energyUsed || 0n) - availableEnergy
+    const totalEnergyCost = energyNeeded > 0n ? energyNeeded * BigInt(energyPrice) : 0n
+
+    const bandwidthCost = await this._getBandwidthCost(transaction, { isActivation: false, resources })
+
+    return {
+      fee: totalEnergyCost + bandwidthCost
+    }
+  }
+
+  /**
+   * Returns the fee of a send transaction operation.
+   *
+   * @protected
+   * @param {string} to - The recipient's address.
+   * @param {Transaction} transaction - The transaction.
+   * @returns {Promise<Omit<TransactionResult, 'hash'> & TronActivationFee>} The transaction's fee in SUN.
+   */
+  async _getSendTrxFee (to, transaction) {
+    const recipientAccount = await this._tronWeb.trx.getAccount(to)
+    const isActivation = Object.keys(recipientAccount).length === 0
+    const activationFee = isActivation
+      ? ACCOUNT_ACTIVATION_FEE_SUN
+      : 0n
+
+    const bandwidthCost = await this._getBandwidthCost(transaction, { isActivation })
+
+    return {
+      fee: bandwidthCost + activationFee,
+      activationFee
+    }
   }
 
   /**
@@ -207,29 +276,35 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    * Returns the bandwidth cost of a tron web's transaction.
    *
    * @protected
-   * @param {Transaction<TriggerSmartContract>} transaction - The tron web's transaction
-   * @returns {Promise<number>} The bandwidth cost.
+   * @param {Transaction} transaction - The tron web's transaction.
+   * @param {TronBandwidthCostOptions} [options] - Bandwidth calculation options.
+   * @returns {Promise<bigint>} The bandwidth cost in SUN.
    */
-  async _getBandwidthCost (transaction) {
+  async _getBandwidthCost (transaction, { isActivation, resources: cachedResources } = {}) {
     const rawDataHex = transaction.raw_data_hex
+    // Each hex character represents half a byte. We add the signature length (65 bytes),
+    // the transaction result overhead (64 bytes), and the Protobuf overhead for the transaction envelope.
+    const txSizeInBytes = BigInt(Math.ceil(rawDataHex.length / 2) + SIGNATURE_LENGTH_IN_BYTES + TRANSACTION_RESULT_OVERHEAD_IN_BYTES + PROTOBUF_OVERHEAD_IN_BYTES)
 
     const address = await this.getAddress()
+    const resources = cachedResources ?? await this._tronWeb.trx.getAccountResources(address)
 
-    const resources = await this._tronWeb.trx.getAccountResources(address)
+    const freeBandwidthLeft = BigInt(resources.freeNetLimit || 0) - BigInt(resources.freeNetUsed || 0)
+    const frozenBandwidthLeft = BigInt(resources.NetLimit || 0) - BigInt(resources.NetUsed || 0)
 
-    const freeBandwidthLeft = (resources.freeNetLimit || 0) - (resources.freeNetUsed || 0)
-    const frozenBandwidthLeft = (resources.NetLimit || 0) - (resources.NetUsed || 0)
-    const totalAvailableBandwidth = freeBandwidthLeft + frozenBandwidthLeft
-
-    const missingBandwidth = rawDataHex.length - totalAvailableBandwidth
-
-    if (missingBandwidth <= 0) {
-      return 0
+    if (frozenBandwidthLeft >= txSizeInBytes) {
+      return 0n
     }
 
-    const bandwitdth = Math.ceil(rawDataHex.length * BANDWIDTH_PRICE)
+    if (isActivation) {
+      return ACCOUNT_ACTIVATION_BANDWIDTH_COST
+    }
 
-    return bandwitdth
+    if (freeBandwidthLeft >= txSizeInBytes) {
+      return 0n
+    }
+
+    return txSizeInBytes * BANDWIDTH_PRICE
   }
 
   /**

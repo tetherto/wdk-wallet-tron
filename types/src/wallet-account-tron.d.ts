@@ -64,11 +64,12 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron impleme
      * Sends a transaction.
      *
      * @param {TronTransaction} tx - The transaction.
-     * @returns {Promise<TransactionResult>} The transaction's result.
+     * @returns {Promise<TransactionResult & TronActivationFee>} The transaction's result.
      */
-    sendTransaction(tx: TronTransaction): Promise<TransactionResult>;
+    sendTransaction(tx: TronTransaction): Promise<TransactionResult & TronActivationFee>;
     /**
-     * Transfers a token to another address.
+     * Transfers a TRC-20 token to another address.
+     * TRC-20 transfers do not incur an account activation fee.
      *
      * @param {TransferOptions} options - The transfer's options.
      * @returns {Promise<TransferResult>} The transfer's result.
@@ -94,6 +95,7 @@ export type TransferOptions = import("@tetherto/wdk-wallet").TransferOptions;
 export type TransferResult = import("@tetherto/wdk-wallet").TransferResult;
 export type TronTransaction = import("./wallet-account-read-only-tron.js").TronTransaction;
 export type TronWalletConfig = import("./wallet-account-read-only-tron.js").TronWalletConfig;
+export type TronActivationFee = import("./wallet-account-read-only-tron.js").TronActivationFee;
 export type SignedTransaction = import("tronweb").Types.SignedTransaction;
 import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js';
 import { HDKey } from '@scure/bip32';

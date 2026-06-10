@@ -24,6 +24,7 @@
 
 /** @typedef {import('./src/wallet-account-read-only-tron.js').TronTransaction} TronTransaction */
 /** @typedef {import('./src/wallet-account-read-only-tron.js').TronWalletConfig} TronWalletConfig */
+/** @typedef {import('./src/wallet-account-read-only-tron.js').TronActivationFee} TronActivationFee */
 
 export { default } from './src/wallet-manager-tron.js'
 
