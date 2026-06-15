@@ -30,9 +30,9 @@ import {
   createTronWeb,
   normalizeTronPrivateKey,
   currentTronChainId,
-  setHinkalTronChainId,
-} from "@hinkal/common";
-import { prepareTronHinkal } from "@hinkal/common/providers/prepareTronHinkal";
+  setHinkalTronChainId
+} from '@hinkal/common'
+import { prepareTronHinkal } from '@hinkal/common/providers/prepareTronHinkal'
 
 import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js'
 
@@ -246,31 +246,35 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
     return { hash: txid, fee }
   }
 
-/**
+  /**
  * Prepares a Hinkal session funded by this account on the current Tron chain.
  * Builds the signerAdapter bridge between this wallet's HDKey and Hinkal's TronProviderAdapter.
  *
  * @private
  * @returns {Promise<import('@hinkal/common').Hinkal<unknown>>} The initialized Hinkal session.
  */
-async _prepareHinkal () {
-  const privateKey = normalizeTronPrivateKey(Buffer.from(this._account.privateKey).toString('hex'))
-
-  const signerAdapter = {
-    on () { return this },
-    off () { return this },
-    async signTransaction (transaction) {
-      return await createTronWeb(currentTronChainId).trx.sign(transaction, privateKey)
-    },
-    async signMessage (message) {
-      return await createTronWeb(currentTronChainId).trx.signMessageV2(message, privateKey)
+  async _prepareHinkal () {
+    if (!this._tronWeb) {
+      throw new Error('The wallet must be connected to tron web.')
     }
+    const privateKey = normalizeTronPrivateKey(Buffer.from(this._account.privateKey).toString('hex'))
+    const tronWeb = createTronWeb(currentTronChainId)
+
+    const signerAdapter = {
+      on () { return this },
+      off () { return this },
+      async signTransaction (transaction) {
+        return await tronWeb.trx.sign(transaction, privateKey)
+      },
+      async signMessage (message) {
+        return await tronWeb.trx.signMessageV2(message, privateKey)
+      }
+    }
+
+    return await prepareTronHinkal({ address: await this.getAddress(), signerAdapter })
   }
 
-  return await prepareTronHinkal({ address: await this.getAddress(), signerAdapter })
-}
-
-/**
+  /**
  * Validates token support and prepares a Hinkal session for the current Tron chain.
  *
  * @private
@@ -278,20 +282,20 @@ async _prepareHinkal () {
  * @returns {Promise<{ hinkal: import('@hinkal/common').Hinkal<unknown>, erc20Token: object }>}
  * @throws {Error} If the token is not supported by Hinkal on the current chain.
  */
-async _prepareHinkalForToken (token) {
-  if (!this._tronWeb) {
-    throw new Error('The wallet must be connected to tron web.')
+  async _prepareHinkalForToken (token) {
+    if (!this._tronWeb) {
+      throw new Error('The wallet must be connected to tron web.')
+    }
+    setHinkalTronChainId(currentTronChainId)
+    const erc20Token = getERC20Token(token, currentTronChainId)
+    if (!erc20Token) {
+      throw new Error(`The token ${token} is not supported by Hinkal on chain ${currentTronChainId}.`)
+    }
+    const hinkal = await this._prepareHinkal()
+    return { hinkal, erc20Token }
   }
-  setHinkalTronChainId(currentTronChainId)
-  const erc20Token = getERC20Token(token, currentTronChainId)
-  if (!erc20Token) {
-    throw new Error(`The token ${token} is not supported by Hinkal on chain ${currentTronChainId}.`)
-  }
-  const hinkal = await this._prepareHinkal()
-  return { hinkal, erc20Token }
-}
 
-/**
+  /**
  * Sends a TRC-20 token to another address privately through Hinkal.
  *
  * @param {TransferOptions} options - The transfer's options (`amount` in base units).
@@ -299,13 +303,20 @@ async _prepareHinkalForToken (token) {
  * @throws {Error} If the wallet is not connected to tron web.
  * @throws {Error} If the token is not supported by Hinkal on the current chain.
  */
-async privateSend ({ token, recipient, amount }) {
-  const { hinkal, erc20Token } = await this._prepareHinkalForToken(token)
-  const hash = await hinkal.depositAndWithdraw(erc20Token, [BigInt(amount)], [recipient])
-  return { hash }
-}
+  async privateSend ({ token, recipient, amount }) {
+    const { hinkal, erc20Token } = await this._prepareHinkalForToken(token)
+    if (!this._tronWeb.isAddress(recipient)) {
+      throw new Error('Invalid Tron recipient address.')
+    }
+    const parsedAmount = BigInt(amount)
+    if (parsedAmount <= 0n) {
+      throw new Error('Amount must be positive.')
+    }
+    const hash = await hinkal.depositAndWithdraw(erc20Token, [parsedAmount], [recipient])
+    return { hash }
+  }
 
-/**
+  /**
  * Withdraws this account's stuck Hinkal UTXOs of a token back to its own address.
  *
  * @param {{ token: string }} options - The options (only `token` is used).
@@ -313,28 +324,29 @@ async privateSend ({ token, recipient, amount }) {
  * @throws {Error} If the wallet is not connected to tron web.
  * @throws {Error} If the token is not supported by Hinkal on the current chain.
  */
-async withdrawStuckUtxos ({ token }) {
-  const { hinkal, erc20Token } = await this._prepareHinkalForToken(token)
-  const recipient = await this.getAddress()
-  const hashes = await hinkal.withdrawStuckUtxos(erc20Token, recipient)
-  return { hashes }
-}
+  async withdrawStuckUtxos ({ token }) {
+    const { hinkal, erc20Token } = await this._prepareHinkalForToken(token)
+    const recipient = await this.getAddress()
+    const hashes = await hinkal.withdrawStuckUtxos(erc20Token, recipient)
+    return { hashes }
+  }
 
-/**
+  /**
  * Returns this account's stuck Hinkal shielded balances (UTXOs awaiting recovery).
  *
  * @returns {Promise<Array<{ token: string, balance: bigint }>>} The stuck balance per token.
  * @throws {Error} If the wallet is not connected to tron web.
  */
-async stuckUtxoBalances () {
-  if (!this._tronWeb) {
-    throw new Error('The wallet must be connected to tron web.')
+  async stuckUtxoBalances () {
+    if (!this._tronWeb) {
+      throw new Error('The wallet must be connected to tron web.')
+    }
+    setHinkalTronChainId(currentTronChainId)
+    const hinkal = await this._prepareHinkal()
+    const balances = await hinkal.getStuckShieldedBalances(currentTronChainId)
+    return balances.map(({ token, balance }) => ({ token: token.erc20TokenAddress, balance }))
   }
-  setHinkalTronChainId(currentTronChainId)
-  const hinkal = await this._prepareHinkal()
-  const balances = await hinkal.getStuckShieldedBalances(currentTronChainId)
-  return balances.map(({ token, balance }) => ({ token: token.erc20TokenAddress, balance }))
-}
+
   /**
    * Returns a read-only copy of the account.
    *
