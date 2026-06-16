@@ -171,7 +171,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
 
     if (this._config.transactionMaxFee !== undefined) {
       const fee = await this._getBandwidthCost(transaction)
-      if (BigInt(fee) >= this._config.transactionMaxFee) {
+      if (BigInt(fee) > this._config.transactionMaxFee) {
         throw new Error('Exceeded maximum fee cost for transaction operation.')
       }
     }
@@ -195,7 +195,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
     const transaction = await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
     const fee = await this._getBandwidthCost(transaction)
 
-    if (this._config.transactionMaxFee !== undefined && BigInt(fee) >= this._config.transactionMaxFee) {
+    if (this._config.transactionMaxFee !== undefined && BigInt(fee) > this._config.transactionMaxFee) {
       throw new Error('Exceeded maximum fee cost for transaction operation.')
     }
 
@@ -219,7 +219,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
 
     const { fee } = await this.quoteTransfer({ token, recipient, amount })
 
-    if (this._config.transferMaxFee !== undefined && fee >= this._config.transferMaxFee) {
+    if (this._config.transferMaxFee !== undefined && fee > this._config.transferMaxFee) {
       throw new Error('Exceeded maximum fee cost for transfer operations.')
     }
 

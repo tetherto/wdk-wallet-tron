@@ -125,7 +125,7 @@ describe('WalletAccountTron', () => {
       sendTrxMock.mockResolvedValue(DUMMY_SEND_TRX_RESULT)
 
       getAccountResourcesMock.mockResolvedValue({
-        freeNetLimit: 5000,
+        freeNetLimit: 0,
         freeNetUsed: 0,
         NetLimit: 0,
         NetUsed: 0
@@ -133,11 +133,77 @@ describe('WalletAccountTron', () => {
 
       const accountWithMaxFee = new WalletAccountTron(SEED_PHRASE, "0'/0/0", {
         provider: 'https://tron.web.provider/',
-        transactionMaxFee: 0
+        transactionMaxFee: 100_000n
       })
 
       await expect(accountWithMaxFee.signTransaction(TRANSACTION))
         .rejects.toThrow('Exceeded maximum fee cost for transaction operation.')
+    })
+
+    test('should allow a fee exactly equal to transactionMaxFee', async () => {
+      const TRANSACTION = {
+        to: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
+        value: 1_000_000
+      }
+      const DUMMY_SEND_TRX_RESULT = {
+        txID: '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f',
+        raw_data_hex: '0a' + '00'.repeat(100)
+      }
+      const EXPECTED_SIGNATURE = 'e2fbd0590d2a6150952afdcdb8c0b137a8828fe45dacc6f17f552b10234baa9231811488104983c4d4333ad51c90343801aa72e41b1d576719cc798c4c98546100'
+
+      sendTrxMock.mockResolvedValue(DUMMY_SEND_TRX_RESULT)
+
+      getAccountResourcesMock.mockResolvedValue({
+        freeNetLimit: 0,
+        freeNetUsed: 0,
+        NetLimit: 0,
+        NetUsed: 0
+      })
+
+      const accountWithMaxFee = new WalletAccountTron(SEED_PHRASE, "0'/0/0", {
+        provider: 'https://tron.web.provider/',
+        transactionMaxFee: 202_000n
+      })
+
+      const signedTx = await accountWithMaxFee.signTransaction(TRANSACTION)
+
+      expect(signedTx).toEqual({
+        ...DUMMY_SEND_TRX_RESULT,
+        signature: [EXPECTED_SIGNATURE]
+      })
+    })
+
+    test('should allow a fee below transactionMaxFee', async () => {
+      const TRANSACTION = {
+        to: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
+        value: 1_000_000
+      }
+      const DUMMY_SEND_TRX_RESULT = {
+        txID: '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f',
+        raw_data_hex: '0a' + '00'.repeat(100)
+      }
+      const EXPECTED_SIGNATURE = 'e2fbd0590d2a6150952afdcdb8c0b137a8828fe45dacc6f17f552b10234baa9231811488104983c4d4333ad51c90343801aa72e41b1d576719cc798c4c98546100'
+
+      sendTrxMock.mockResolvedValue(DUMMY_SEND_TRX_RESULT)
+
+      getAccountResourcesMock.mockResolvedValue({
+        freeNetLimit: 0,
+        freeNetUsed: 0,
+        NetLimit: 0,
+        NetUsed: 0
+      })
+
+      const accountWithMaxFee = new WalletAccountTron(SEED_PHRASE, "0'/0/0", {
+        provider: 'https://tron.web.provider/',
+        transactionMaxFee: 300_000n
+      })
+
+      const signedTx = await accountWithMaxFee.signTransaction(TRANSACTION)
+
+      expect(signedTx).toEqual({
+        ...DUMMY_SEND_TRX_RESULT,
+        signature: [EXPECTED_SIGNATURE]
+      })
     })
 
     test('should sign a transaction and return the signed tx', async () => {
@@ -212,7 +278,7 @@ describe('WalletAccountTron', () => {
       sendTrxMock.mockResolvedValue(DUMMY_SEND_TRX_RESULT)
 
       getAccountResourcesMock.mockResolvedValue({
-        freeNetLimit: 5000,
+        freeNetLimit: 0,
         freeNetUsed: 0,
         NetLimit: 0,
         NetUsed: 0
@@ -220,11 +286,75 @@ describe('WalletAccountTron', () => {
 
       const accountWithMaxFee = new WalletAccountTron(SEED_PHRASE, "0'/0/0", {
         provider: 'https://tron.web.provider/',
-        transactionMaxFee: 0
+        transactionMaxFee: 100_000n
       })
 
       await expect(accountWithMaxFee.sendTransaction(TRANSACTION))
         .rejects.toThrow('Exceeded maximum fee cost for transaction operation.')
+    })
+
+    test('should allow a fee exactly equal to transactionMaxFee', async () => {
+      const TRANSACTION = {
+        to: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
+        value: 1_000_000
+      }
+      const DUMMY_TX_ID = 'abc123def456'
+      const DUMMY_SEND_TRX_RESULT = {
+        txID: '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f',
+        raw_data_hex: '0a' + '00'.repeat(100)
+      }
+
+      sendTrxMock.mockResolvedValue(DUMMY_SEND_TRX_RESULT)
+      sendRawTransactionMock.mockResolvedValue({ txid: DUMMY_TX_ID })
+
+      getAccountResourcesMock.mockResolvedValue({
+        freeNetLimit: 0,
+        freeNetUsed: 0,
+        NetLimit: 0,
+        NetUsed: 0
+      })
+
+      const accountWithMaxFee = new WalletAccountTron(SEED_PHRASE, "0'/0/0", {
+        provider: 'https://tron.web.provider/',
+        transactionMaxFee: 202_000n
+      })
+
+      const { hash, fee } = await accountWithMaxFee.sendTransaction(TRANSACTION)
+
+      expect(hash).toBe(DUMMY_TX_ID)
+      expect(fee).toBe(202_000n)
+    })
+
+    test('should allow a fee below transactionMaxFee', async () => {
+      const TRANSACTION = {
+        to: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
+        value: 1_000_000
+      }
+      const DUMMY_TX_ID = 'abc123def456'
+      const DUMMY_SEND_TRX_RESULT = {
+        txID: '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f',
+        raw_data_hex: '0a' + '00'.repeat(100)
+      }
+
+      sendTrxMock.mockResolvedValue(DUMMY_SEND_TRX_RESULT)
+      sendRawTransactionMock.mockResolvedValue({ txid: DUMMY_TX_ID })
+
+      getAccountResourcesMock.mockResolvedValue({
+        freeNetLimit: 0,
+        freeNetUsed: 0,
+        NetLimit: 0,
+        NetUsed: 0
+      })
+
+      const accountWithMaxFee = new WalletAccountTron(SEED_PHRASE, "0'/0/0", {
+        provider: 'https://tron.web.provider/',
+        transactionMaxFee: 300_000n
+      })
+
+      const { hash, fee } = await accountWithMaxFee.sendTransaction(TRANSACTION)
+
+      expect(hash).toBe(DUMMY_TX_ID)
+      expect(fee).toBe(202_000n)
     })
 
     test('should throw if the account is not connected to tron web', async () => {
