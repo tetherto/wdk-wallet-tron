@@ -159,6 +159,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    *
    * @param {TronTransaction} tx - The transaction to sign.
    * @returns {Promise<SignedTransaction>} The signed transaction.
+   * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
    */
   async signTransaction ({ to, value }) {
     if (!this._tronWeb) {
@@ -184,6 +185,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    *
    * @param {TronTransaction} tx - The transaction.
    * @returns {Promise<TransactionResult>} The transaction's result.
+   * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
    */
   async sendTransaction ({ to, value }) {
     if (!this._tronWeb) {
@@ -211,6 +213,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    *
    * @param {TransferOptions} options - The transfer's options.
    * @returns {Promise<TransferResult>} The transfer's result.
+   * @throws {Error} If the transfer's cost exceeds the maximum transfer fee option.
    */
   async transfer ({ token, recipient, amount }) {
     if (!this._tronWeb) {
