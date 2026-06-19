@@ -3,16 +3,16 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      * Creates a new tron read-only wallet account.
      *
      * @param {string} address - The account's address.
-     * @param {Omit<TronWalletConfig, 'transferMaxFee'>} [config] - The configuration object.
+     * @param {Omit<TronWalletConfig, 'transferMaxFee' | 'transactionMaxFee'>} [config] - The configuration object.
      */
-    constructor(address: string, config?: Omit<TronWalletConfig, "transferMaxFee">);
+    constructor(address: string, config?: Omit<TronWalletConfig, "transferMaxFee" | "transactionMaxFee">);
     /**
      * The read-only wallet account configuration.
      *
      * @protected
-     * @type {Omit<TronWalletConfig, "transferMaxFee">}
+     * @type {Omit<TronWalletConfig, "transferMaxFee" | "transactionMaxFee">}
      */
-    protected _config: Omit<TronWalletConfig, "transferMaxFee">;
+    protected _config: Omit<TronWalletConfig, "transferMaxFee" | "transactionMaxFee">;
     /**
      * The tron web client.
      *
@@ -84,10 +84,10 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     /**
      * Initializes the tron web provider with optional failover support.
      *
-     * @param {Omit<TronWalletConfig, 'transferMaxFee'>} config - The read-only wallet account configuration.
+     * @param {Omit<TronWalletConfig, 'transferMaxFee' | 'transactionMaxFee'>} config - The read-only wallet account configuration.
      * @returns {TronWeb | undefined} The initialized tron web provider.
      */
-    static initializeProvider(config: Omit<TronWalletConfig, "transferMaxFee">): TronWeb | undefined;
+    static initializeProvider(config: Omit<TronWalletConfig, "transferMaxFee" | "transactionMaxFee">): TronWeb | undefined;
 }
 export type Transaction = import("tronweb").Types.Transaction;
 export type AccountResourceMessage = import("tronweb").Types.AccountResourceMessage;
@@ -118,6 +118,10 @@ export type TronWalletConfig = {
      * - The maximum fee amount for transfer operations.
      */
     transferMaxFee?: number | bigint;
+    /**
+     * - The maximum fee amount for sendTransaction and signTransaction operations.
+     */
+    transactionMaxFee?: number | bigint;
 };
 export type TronActivationFee = {
     /**

@@ -39,6 +39,7 @@ import { TronWeb, Trx } from 'tronweb'
  * @property {string | TronWeb | Array<string | TronWeb>} [provider] - The url of the tron web provider, or an instance of the {@link TronWeb} class. It's also possible to provide a list of urls or {@link TronWeb} instances instead. In such case, connection errors will cause the wallet to automatically fallback on the next provider in the list. When passing {@link TronWeb} instances, the first one becomes the wallet's primary client; the others contribute only their `fullNode` / `solidityNode` / `eventServer` to the failover pool.
  * @property {number} [retries] - If set and if 'provider' is a list of urls or {@link TronWeb} instances, the number of additional retry attempts after the initial call fails. Total attempts = `1 + retries`. For example, `retries: 3` with 4 providers will try each provider once before throwing. If `retries` exceeds the number of providers, the failover will loop back and retry already-failed providers in round-robin order. Default: 3.
  * @property {number | bigint} [transferMaxFee] - The maximum fee amount for transfer operations.
+ * @property {number | bigint} [transactionMaxFee] - The maximum fee amount for sendTransaction and signTransaction operations.
  */
 
 /**
@@ -76,7 +77,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    * Creates a new tron read-only wallet account.
    *
    * @param {string} address - The account's address.
-   * @param {Omit<TronWalletConfig, 'transferMaxFee'>} [config] - The configuration object.
+   * @param {Omit<TronWalletConfig, 'transferMaxFee' | 'transactionMaxFee'>} [config] - The configuration object.
    */
   constructor (address, config = {}) {
     super(address)
@@ -85,7 +86,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      * The read-only wallet account configuration.
      *
      * @protected
-     * @type {Omit<TronWalletConfig, "transferMaxFee">}
+     * @type {Omit<TronWalletConfig, 'transferMaxFee' | 'transactionMaxFee'>}
      */
     this._config = config
 
@@ -310,7 +311,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
   /**
    * Initializes the tron web provider with optional failover support.
    *
-   * @param {Omit<TronWalletConfig, 'transferMaxFee'>} config - The read-only wallet account configuration.
+   * @param {Omit<TronWalletConfig, 'transferMaxFee' | 'transactionMaxFee'>} config - The read-only wallet account configuration.
    * @returns {TronWeb | undefined} The initialized tron web provider.
    */
   static initializeProvider (config) {

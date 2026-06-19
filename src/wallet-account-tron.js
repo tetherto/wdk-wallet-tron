@@ -161,6 +161,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    *
    * @param {TronTransaction} tx - The transaction to sign.
    * @returns {Promise<SignedTransaction>} The signed transaction.
+   * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
    */
   async signTransaction ({ to, value }) {
     if (!this._tronWeb) {
@@ -171,6 +172,13 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
 
     const transaction = await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
 
+    if (this._config.transactionMaxFee !== undefined) {
+      const fee = await this._getBandwidthCost(transaction)
+      if (BigInt(fee) > this._config.transactionMaxFee) {
+        throw new Error('Exceeded maximum fee cost for transaction operation.')
+      }
+    }
+
     return await this._signTransaction(transaction)
   }
 
@@ -179,6 +187,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    *
    * @param {TronTransaction} tx - The transaction.
    * @returns {Promise<TransactionResult & TronActivationFee>} The transaction's result.
+   * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
    */
   async sendTransaction ({ to, value }) {
     if (!this._tronWeb) {
@@ -189,6 +198,11 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
 
     const transaction = await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
     const { fee, activationFee } = await this._getSendTrxFee(to, transaction)
+
+    if (this._config.transactionMaxFee !== undefined && BigInt(fee) > BigInt(this._config.transactionMaxFee)) {
+      throw new Error('Exceeded maximum fee cost for transaction operation.')
+    }
+
     const signedTransaction = await this._signTransaction(transaction)
 
     const { txid } = await this._tronWeb.trx.sendRawTransaction(signedTransaction)
@@ -202,6 +216,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    *
    * @param {TransferOptions} options - The transfer's options.
    * @returns {Promise<TransferResult>} The transfer's result.
+   * @throws {Error} If the transfer's cost exceeds the maximum transfer fee option.
    */
   async transfer ({ token, recipient, amount }) {
     if (!this._tronWeb) {
@@ -210,7 +225,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
 
     const { fee } = await this.quoteTransfer({ token, recipient, amount })
 
-    if (this._config.transferMaxFee !== undefined && fee >= BigInt(this._config.transferMaxFee)) {
+    if (this._config.transferMaxFee !== undefined && fee > BigInt(this._config.transferMaxFee)) {
       throw new Error('Exceeded maximum fee cost for transfer operations.')
     }
 
