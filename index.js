@@ -23,6 +23,7 @@
 /** @typedef {import('@tetherto/wdk-wallet').TransferResult} TransferResult */
 
 /** @typedef {import('./src/wallet-account-read-only-tron.js').TronTransaction} TronTransaction */
+/** @typedef {import('./src/wallet-account-read-only-tron.js').TronBuilderCall} TronBuilderCall */
 /** @typedef {import('./src/wallet-account-read-only-tron.js').TronWalletConfig} TronWalletConfig */
 /** @typedef {import('./src/wallet-account-read-only-tron.js').TronActivationFee} TronActivationFee */
 

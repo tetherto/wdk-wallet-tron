@@ -11,7 +11,9 @@ const getTransactionInfoMock = jest.fn()
 const getChainParametersMock = jest.fn()
 
 const triggerConstantContractMock = jest.fn()
+const triggerSmartContractMock = jest.fn()
 const sendTrxMock = jest.fn()
+const freezeBalanceV2Mock = jest.fn()
 
 jest.unstable_mockModule('tronweb', () => {
   const TronWebMock = jest.fn().mockImplementation((options) => {
@@ -27,7 +29,9 @@ jest.unstable_mockModule('tronweb', () => {
 
     provider.transactionBuilder = {
       triggerConstantContract: triggerConstantContractMock,
-      sendTrx: sendTrxMock
+      triggerSmartContract: triggerSmartContractMock,
+      sendTrx: sendTrxMock,
+      freezeBalanceV2: freezeBalanceV2Mock
     }
 
     return provider
@@ -134,19 +138,32 @@ describe('WalletAccountReadOnlyTron', () => {
   })
 
   describe('quoteSendTransaction', () => {
-    test('should successfully quote a transaction', async () => {
-      const TRANSACTION = {
-        to: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
-        value: 1_000_000
-      }
+    const RECIPIENT = 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD'
+
+    const transferTx = (to) => ({
+      txID: 'dummy-tx-id',
+      raw_data: {
+        contract: [{
+          type: 'TransferContract',
+          parameter: {
+            value: {
+              amount: 1_000_000,
+              owner_address: TronWeb.address.toHex(ADDRESS),
+              to_address: TronWeb.address.toHex(to)
+            }
+          }
+        }]
+      },
+      raw_data_hex: '0a' + '00'.repeat(100)
+    })
+
+    test('should successfully quote a tronix transfer', async () => {
+      const TRANSACTION = { to: RECIPIENT, value: 1_000_000 }
       const EXPECTED_FEE = 245_000n
 
-      sendTrxMock.mockResolvedValue({
-        txID: 'dummy-tx-id',
-        raw_data_hex: '0a' + '00'.repeat(100)
-      })
+      sendTrxMock.mockResolvedValue(transferTx(RECIPIENT))
 
-      getAccountMock.mockResolvedValue({ address: TRANSACTION.to })
+      getAccountMock.mockResolvedValue({ address: RECIPIENT }) // recipient already activated
 
       getAccountResourcesMock.mockResolvedValue({
         freeNetLimit: 5000,
@@ -157,13 +174,8 @@ describe('WalletAccountReadOnlyTron', () => {
 
       const { fee, activationFee } = await account.quoteSendTransaction(TRANSACTION)
 
-      expect(sendTrxMock).toHaveBeenCalledWith(
-        TRANSACTION.to,
-        TRANSACTION.value,
-        ADDRESS
-      )
-
-      expect(getAccountMock).toHaveBeenCalledWith(TRANSACTION.to)
+      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ADDRESS)
+      expect(getAccountMock).toHaveBeenCalledWith(TronWeb.address.toHex(RECIPIENT))
       expect(getAccountResourcesMock).toHaveBeenCalledWith(ADDRESS)
 
       expect(fee).toBe(EXPECTED_FEE)
@@ -171,18 +183,12 @@ describe('WalletAccountReadOnlyTron', () => {
     })
 
     test('should quote 1.1 TRX for account activation when resources are missing', async () => {
-      const TRANSACTION = {
-        to: ADDRESS,
-        value: 1_000_000
-      }
+      const TRANSACTION = { to: ADDRESS, value: 1_000_000 }
       // 1 TRX (Activation) + 0.1 TRX (Fixed Bandwidth Burn) = 1.1 TRX = 1,100,000 SUN
       const EXPECTED_FEE = 1_100_000n
       const EXPECTED_ACTIVATION_FEE = 1_000_000n
 
-      sendTrxMock.mockResolvedValue({
-        txID: 'dummy-tx-id',
-        raw_data_hex: '0a' + '00'.repeat(100)
-      })
+      sendTrxMock.mockResolvedValue(transferTx(ADDRESS))
 
       getAccountMock.mockResolvedValue({}) // Account does not exist
 
@@ -195,27 +201,18 @@ describe('WalletAccountReadOnlyTron', () => {
 
       const { fee, activationFee } = await account.quoteSendTransaction(TRANSACTION)
 
-      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ADDRESS)
-      expect(getAccountMock).toHaveBeenCalledWith(TRANSACTION.to)
-      expect(getAccountResourcesMock).toHaveBeenCalledWith(ADDRESS)
-
+      expect(getAccountMock).toHaveBeenCalledWith(TronWeb.address.toHex(ADDRESS))
       expect(fee).toBe(EXPECTED_FEE)
       expect(activationFee).toBe(EXPECTED_ACTIVATION_FEE)
     })
 
     test('should quote only 1 TRX for account activation when frozen bandwidth is sufficient', async () => {
-      const TRANSACTION = {
-        to: ADDRESS,
-        value: 1_000_000
-      }
+      const TRANSACTION = { to: ADDRESS, value: 1_000_000 }
       // 1 TRX (Activation) + 0 SUN (Frozen BP covers it) = 1,000,000 SUN
       const EXPECTED_FEE = 1_000_000n
       const EXPECTED_ACTIVATION_FEE = 1_000_000n
 
-      sendTrxMock.mockResolvedValue({
-        txID: 'dummy-tx-id',
-        raw_data_hex: '0a' + '00'.repeat(100)
-      })
+      sendTrxMock.mockResolvedValue(transferTx(ADDRESS))
 
       getAccountMock.mockResolvedValue({}) // Account does not exist
 
@@ -228,12 +225,105 @@ describe('WalletAccountReadOnlyTron', () => {
 
       const { fee, activationFee } = await account.quoteSendTransaction(TRANSACTION)
 
-      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ADDRESS)
-      expect(getAccountMock).toHaveBeenCalledWith(TRANSACTION.to)
-      expect(getAccountResourcesMock).toHaveBeenCalledWith(ADDRESS)
-
       expect(fee).toBe(EXPECTED_FEE)
       expect(activationFee).toBe(EXPECTED_ACTIVATION_FEE)
+    })
+
+    test('should quote a smart contract call (energy + bandwidth, no activation fee)', async () => {
+      const CONTRACT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'
+      const CALL = {
+        method: 'triggerSmartContract',
+        args: [
+          CONTRACT,
+          'approve(address,uint256)',
+          { feeLimit: 15_000_000 },
+          [{ type: 'address', value: TronWeb.address.toHex(RECIPIENT) }, { type: 'uint256', value: 100 }],
+          TronWeb.address.toHex(ADDRESS)
+        ]
+      }
+      // energy_used (10000) * energy price (420) = 4,200,000 SUN; bandwidth covered by the free limit
+      const EXPECTED_FEE = 4_200_000n
+
+      triggerSmartContractMock.mockResolvedValue({
+        transaction: {
+          txID: 'contract-tx-id',
+          raw_data: {
+            contract: [{
+              type: 'TriggerSmartContract',
+              parameter: {
+                value: {
+                  contract_address: TronWeb.address.toHex(CONTRACT),
+                  owner_address: TronWeb.address.toHex(ADDRESS),
+                  data: 'deadbeef',
+                  call_value: 0
+                }
+              }
+            }]
+          },
+          raw_data_hex: '0a' + '00'.repeat(200)
+        }
+      })
+
+      triggerConstantContractMock.mockResolvedValue({ energy_used: 10000 })
+
+      getAccountResourcesMock.mockResolvedValue({
+        freeNetLimit: 5000,
+        freeNetUsed: 0,
+        NetLimit: 0,
+        NetUsed: 0,
+        EnergyLimit: 0,
+        EnergyUsed: 0
+      })
+
+      getChainParametersMock.mockResolvedValue([{ key: 'getEnergyFee', value: 420 }])
+
+      const { fee, activationFee } = await account.quoteSendTransaction(CALL)
+
+      expect(triggerConstantContractMock).toHaveBeenCalledWith(
+        TronWeb.address.toHex(CONTRACT),
+        '',
+        { input: 'deadbeef', callValue: 0 },
+        [],
+        TronWeb.address.toHex(ADDRESS)
+      )
+      expect(fee).toBe(EXPECTED_FEE)
+      expect(activationFee).toBe(0n)
+    })
+
+    test('should quote a system contract (bandwidth only, no energy, no activation)', async () => {
+      const CALL = { method: 'freezeBalanceV2', args: [10_000_000, 'ENERGY', ADDRESS] }
+      const EXPECTED_FEE = 245_000n
+
+      freezeBalanceV2Mock.mockResolvedValue({
+        txID: 'freeze-tx-id',
+        raw_data: {
+          contract: [{
+            type: 'FreezeBalanceV2Contract',
+            parameter: { value: { owner_address: TronWeb.address.toHex(ADDRESS), frozen_balance: 10_000_000, resource: 'ENERGY' } }
+          }]
+        },
+        raw_data_hex: '0a' + '00'.repeat(100)
+      })
+
+      getAccountResourcesMock.mockResolvedValue({
+        freeNetLimit: 0,
+        freeNetUsed: 0,
+        NetLimit: 0,
+        NetUsed: 0
+      })
+
+      const { fee, activationFee } = await account.quoteSendTransaction(CALL)
+
+      expect(freezeBalanceV2Mock).toHaveBeenCalledWith(10_000_000, 'ENERGY', ADDRESS)
+      expect(triggerConstantContractMock).not.toHaveBeenCalled()
+      expect(getChainParametersMock).not.toHaveBeenCalled()
+      expect(fee).toBe(EXPECTED_FEE)
+      expect(activationFee).toBe(0n)
+    })
+
+    test('should throw for an unknown builder method', async () => {
+      await expect(account.quoteSendTransaction({ method: 'notARealMethod', args: [] }))
+        .rejects.toThrow("Unknown tron web transaction builder method: 'notARealMethod'.")
     })
 
     test('should throw if the account is not connected to tron web', async () => {
