@@ -164,7 +164,7 @@ describe('WalletAccountTron', () => {
 
       const accountWithMaxFee = new WalletAccountTron(SEED_PHRASE, "0'/0/0", {
         provider: 'https://tron.web.provider/',
-        transactionMaxFee: 202_000n
+        transactionMaxFee: 245_000n
       })
 
       const signedTx = await accountWithMaxFee.signTransaction(TRANSACTION)
@@ -313,6 +313,8 @@ describe('WalletAccountTron', () => {
       sendTrxMock.mockResolvedValue(DUMMY_SEND_TRX_RESULT)
       sendRawTransactionMock.mockResolvedValue({ txid: DUMMY_TX_ID })
 
+      getAccountMock.mockResolvedValue({ address: TRANSACTION.to })
+
       getAccountResourcesMock.mockResolvedValue({
         freeNetLimit: 0,
         freeNetUsed: 0,
@@ -322,13 +324,13 @@ describe('WalletAccountTron', () => {
 
       const accountWithMaxFee = new WalletAccountTron(SEED_PHRASE, "0'/0/0", {
         provider: 'https://tron.web.provider/',
-        transactionMaxFee: 202_000n
+        transactionMaxFee: 245_000n
       })
 
       const { hash, fee } = await accountWithMaxFee.sendTransaction(TRANSACTION)
 
       expect(hash).toBe(DUMMY_TX_ID)
-      expect(fee).toBe(202_000n)
+      expect(fee).toBe(245_000n)
     })
 
     test('should allow a fee below transactionMaxFee', async () => {
@@ -345,6 +347,8 @@ describe('WalletAccountTron', () => {
       sendTrxMock.mockResolvedValue(DUMMY_SEND_TRX_RESULT)
       sendRawTransactionMock.mockResolvedValue({ txid: DUMMY_TX_ID })
 
+      getAccountMock.mockResolvedValue({ address: TRANSACTION.to })
+
       getAccountResourcesMock.mockResolvedValue({
         freeNetLimit: 0,
         freeNetUsed: 0,
@@ -360,7 +364,7 @@ describe('WalletAccountTron', () => {
       const { hash, fee } = await accountWithMaxFee.sendTransaction(TRANSACTION)
 
       expect(hash).toBe(DUMMY_TX_ID)
-      expect(fee).toBe(202_000n)
+      expect(fee).toBe(245_000n)
     })
 
     test('should throw if the account is not connected to tron web', async () => {

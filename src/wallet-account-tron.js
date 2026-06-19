@@ -199,7 +199,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
     const transaction = await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
     const { fee, activationFee } = await this._getSendTrxFee(to, transaction)
 
-    if (this._config.transactionMaxFee !== undefined && BigInt(fee) > this._config.transactionMaxFee) {
+    if (this._config.transactionMaxFee !== undefined && BigInt(fee) > BigInt(this._config.transactionMaxFee)) {
       throw new Error('Exceeded maximum fee cost for transaction operation.')
     }
 
