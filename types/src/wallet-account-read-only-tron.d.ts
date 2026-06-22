@@ -21,8 +21,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      */
     protected _tronWeb: TronWeb | undefined;
     /**
-     * Returns whether a transaction is a tron web transaction builder call
-     * (as opposed to a native tronix transfer).
+     * Returns whether a transaction is a builder call.
      *
      * @protected
      * @param {TronTransaction} tx - The transaction.
@@ -109,11 +108,11 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      *
      * @protected
      * @param {number} energyUsed - The energy consumed by the call.
-     * @param {TronAccountResources} resources - The sender's resource snapshot.
+     * @param {AccountResourceMessage} resources - The sender's resource snapshot.
      * @param {number} energyPrice - The energy price (in SUN).
      * @returns {bigint} The energy cost in SUN.
      */
-    protected _netEnergyCost(energyUsed: number, resources: TronAccountResources, energyPrice: number): bigint;
+    protected _netEnergyCost(energyUsed: number, resources: AccountResourceMessage, energyPrice: number): bigint;
     /**
      * Quotes the costs of TRC-20 transfer operation.
      * TRC-20 transfers do not incur an account activation fee.
@@ -162,32 +161,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
 }
 export type Transaction = import("tronweb").Types.Transaction;
 export type TronTransactionReceipt = import("tronweb").Types.TransactionInfo;
-export type TronAccountResources = {
-    /**
-     * - The account's free bandwidth limit.
-     */
-    freeNetLimit?: number;
-    /**
-     * - The free bandwidth already used.
-     */
-    freeNetUsed?: number;
-    /**
-     * - The account's staked (frozen) bandwidth limit.
-     */
-    NetLimit?: number;
-    /**
-     * - The staked bandwidth already used.
-     */
-    NetUsed?: number;
-    /**
-     * - The account's staked energy limit.
-     */
-    EnergyLimit?: number;
-    /**
-     * - The staked energy already used.
-     */
-    EnergyUsed?: number;
-};
+export type AccountResourceMessage = import("tronweb").Types.AccountResourceMessage;
 export type TransactionResult = import("@tetherto/wdk-wallet").TransactionResult;
 export type TransferOptions = import("@tetherto/wdk-wallet").TransferOptions;
 export type TransferResult = import("@tetherto/wdk-wallet").TransferResult;
@@ -201,13 +175,21 @@ export type TronTrxTransfer = {
      */
     value: number | bigint;
 };
+/**
+ * A `tronWeb.transactionBuilder` call, used for smart contract calls and system
+ * contracts (e.g. staking, voting).
+ *
+ * The available `method` names and the positional `args` each one expects are listed in the
+ * tron web transaction builder API reference:
+ * {@link https://tronweb.network/docu/docs/API%20List/transactionBuilder/}.
+ */
 export type TronBuilderCall = {
     /**
-     * - The `tronWeb.transactionBuilder` method to invoke (e.g. 'triggerSmartContract', 'freezeBalanceV2'). See the API reference linked above.
+     * - The `tronWeb.transactionBuilder` method to invoke (e.g. 'triggerSmartContract', 'freezeBalanceV2').
      */
     method: string;
     /**
-     * - The positional arguments passed to the builder method, in the order documented in the API reference (default: []).
+     * - The positional arguments for the method (default: []).
      */
     args?: Array<unknown>;
 };
@@ -244,7 +226,7 @@ export type TronBandwidthCostOptions = {
     /**
      * - Resource snapshot returned by `getAccountResources` for the sender.
      */
-    resources?: TronAccountResources;
+    resources?: AccountResourceMessage;
 };
 import { WalletAccountReadOnly } from '@tetherto/wdk-wallet';
 import { TronWeb } from 'tronweb';

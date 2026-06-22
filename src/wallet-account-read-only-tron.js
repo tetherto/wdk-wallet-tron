@@ -22,19 +22,7 @@ import { TronWeb, Trx } from 'tronweb'
 
 /** @typedef {import('tronweb').Types.Transaction} Transaction */
 /** @typedef {import('tronweb').Types.TransactionInfo} TronTransactionReceipt */
-
-/**
- * The subset of an account's resource snapshot (as returned by `getAccountResources`)
- * used for fee estimation.
- *
- * @typedef {Object} TronAccountResources
- * @property {number} [freeNetLimit] - The account's free bandwidth limit.
- * @property {number} [freeNetUsed] - The free bandwidth already used.
- * @property {number} [NetLimit] - The account's staked (frozen) bandwidth limit.
- * @property {number} [NetUsed] - The staked bandwidth already used.
- * @property {number} [EnergyLimit] - The account's staked energy limit.
- * @property {number} [EnergyUsed] - The staked energy already used.
- */
+/** @typedef {import('tronweb').Types.AccountResourceMessage} AccountResourceMessage */
 
 /** @typedef {import('@tetherto/wdk-wallet').TransactionResult} TransactionResult */
 /** @typedef {import('@tetherto/wdk-wallet').TransferOptions} TransferOptions */
@@ -49,19 +37,16 @@ import { TronWeb, Trx } from 'tronweb'
  */
 
 /**
- * An arbitrary transaction expressed as a tron web transaction builder call. The wallet
- * builds it with its own tron web client (`tronWeb.transactionBuilder[method](...args)`),
- * then quotes, signs and broadcasts it. Use this for smart contract calls
- * (`method: 'triggerSmartContract'`) and system contracts such as staking, delegation,
- * voting or TRC-10 transfers (`'freezeBalanceV2'`, `'delegateResource'`, `'vote'`, `'sendToken'`, …).
+ * A `tronWeb.transactionBuilder` call, used for smart contract calls and system
+ * contracts (e.g. staking, voting).
  *
  * The available `method` names and the positional `args` each one expects are listed in the
  * tron web transaction builder API reference:
  * {@link https://tronweb.network/docu/docs/API%20List/transactionBuilder/}.
  *
  * @typedef {Object} TronBuilderCall
- * @property {string} method - The `tronWeb.transactionBuilder` method to invoke (e.g. 'triggerSmartContract', 'freezeBalanceV2'). See the API reference linked above.
- * @property {Array<unknown>} [args] - The positional arguments passed to the builder method, in the order documented in the API reference (default: []).
+ * @property {string} method - The `tronWeb.transactionBuilder` method to invoke (e.g. 'triggerSmartContract', 'freezeBalanceV2').
+ * @property {Array<unknown>} [args] - The positional arguments for the method (default: []).
  */
 
 /**
@@ -86,7 +71,7 @@ import { TronWeb, Trx } from 'tronweb'
 /**
  * @typedef {Object} TronBandwidthCostOptions
  * @property {boolean} [isActivation] - Whether the transaction activates a new recipient account.
- * @property {TronAccountResources} [resources] - Resource snapshot returned by `getAccountResources` for the sender.
+ * @property {AccountResourceMessage} [resources] - Resource snapshot returned by `getAccountResources` for the sender.
  */
 
 const BANDWIDTH_PRICE = 1_000n
@@ -136,8 +121,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
   }
 
   /**
-   * Returns whether a transaction is a tron web transaction builder call
-   * (as opposed to a native tronix transfer).
+   * Returns whether a transaction is a builder call.
    *
    * @protected
    * @param {TronTransaction} tx - The transaction.
@@ -329,7 +313,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    *
    * @protected
    * @param {number} energyUsed - The energy consumed by the call.
-   * @param {TronAccountResources} resources - The sender's resource snapshot.
+   * @param {AccountResourceMessage} resources - The sender's resource snapshot.
    * @param {number} energyPrice - The energy price (in SUN).
    * @returns {bigint} The energy cost in SUN.
    */
