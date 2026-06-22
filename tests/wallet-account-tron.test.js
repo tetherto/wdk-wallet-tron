@@ -270,6 +270,7 @@ describe('WalletAccountTron', () => {
 
       expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ACCOUNT.address)
       expect(getAccountMock).toHaveBeenCalledWith(TronWeb.address.toHex(RECIPIENT))
+      expect(getAccountResourcesMock).toHaveBeenCalledWith(ACCOUNT.address)
       expect(sendRawTransactionMock).toHaveBeenCalledWith({
         ...DUMMY_SEND_TRX_RESULT,
         signature: [EXPECTED_SIGNATURE]

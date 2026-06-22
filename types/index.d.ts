@@ -8,5 +8,6 @@ export type TransactionResult = import("@tetherto/wdk-wallet").TransactionResult
 export type TransferOptions = import("@tetherto/wdk-wallet").TransferOptions;
 export type TransferResult = import("@tetherto/wdk-wallet").TransferResult;
 export type TronTransaction = import("./src/wallet-account-read-only-tron.js").TronTransaction;
+export type TronBuilderCall = import("./src/wallet-account-read-only-tron.js").TronBuilderCall;
 export type TronWalletConfig = import("./src/wallet-account-read-only-tron.js").TronWalletConfig;
 export type TronActivationFee = import("./src/wallet-account-read-only-tron.js").TronActivationFee;

@@ -201,7 +201,9 @@ describe('WalletAccountReadOnlyTron', () => {
 
       const { fee, activationFee } = await account.quoteSendTransaction(TRANSACTION)
 
+      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ADDRESS)
       expect(getAccountMock).toHaveBeenCalledWith(TronWeb.address.toHex(ADDRESS))
+      expect(getAccountResourcesMock).toHaveBeenCalledWith(ADDRESS)
       expect(fee).toBe(EXPECTED_FEE)
       expect(activationFee).toBe(EXPECTED_ACTIVATION_FEE)
     })
@@ -225,6 +227,9 @@ describe('WalletAccountReadOnlyTron', () => {
 
       const { fee, activationFee } = await account.quoteSendTransaction(TRANSACTION)
 
+      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ADDRESS)
+      expect(getAccountMock).toHaveBeenCalledWith(TronWeb.address.toHex(ADDRESS))
+      expect(getAccountResourcesMock).toHaveBeenCalledWith(ADDRESS)
       expect(fee).toBe(EXPECTED_FEE)
       expect(activationFee).toBe(EXPECTED_ACTIVATION_FEE)
     })

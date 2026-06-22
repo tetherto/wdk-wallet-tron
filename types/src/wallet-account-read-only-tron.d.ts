@@ -21,6 +21,15 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      */
     protected _tronWeb: TronWeb | undefined;
     /**
+     * Returns whether a transaction is a tron web transaction builder call
+     * (as opposed to a native tronix transfer).
+     *
+     * @protected
+     * @param {TronTransaction} tx - The transaction.
+     * @returns {boolean} True if the transaction is a builder call.
+     */
+    protected static _isBuilderCall(tx: TronTransaction): boolean;
+    /**
      * Verifies a message's signature.
      *
      * @param {string} message - The original message.
@@ -49,6 +58,63 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      */
     quoteSendTransaction(tx: TronTransaction): Promise<Omit<TransactionResult, "hash"> & TronActivationFee>;
     /**
+     * Builds an unsigned tron web transaction from a native tronix transfer
+     * (`{ to, value }`) or a transaction builder call (`{ method, args }`).
+     *
+     * @protected
+     * @param {TronTransaction} tx - The transaction.
+     * @returns {Promise<Transaction>} The unsigned tron web transaction.
+     */
+    protected _buildTransaction(tx: TronTransaction): Promise<Transaction>;
+    /**
+     * Quotes the fee of an already-built tron web transaction. The fee is derived from
+     * the transaction's contract type, so this works for every kind of transaction:
+     * - bandwidth: applies to every transaction (derived from its serialized size);
+     * - energy: only smart contract execution (`TriggerSmartContract`) consumes it;
+     * - activation: only native value transfers to a not-yet-activated recipient.
+     *
+     * @protected
+     * @param {Transaction} transaction - The unsigned tron web transaction.
+     * @returns {Promise<Omit<TransactionResult, 'hash'> & TronActivationFee>} The transaction's quotes.
+     */
+    protected _quoteTransaction(transaction: Transaction): Promise<Omit<TransactionResult, "hash"> & TronActivationFee>;
+    /**
+     * Returns whether a transaction is a native value transfer to a not-yet-activated
+     * recipient account (which incurs the account activation fee).
+     *
+     * @protected
+     * @param {string} [type] - The transaction's contract type.
+     * @param {{ to_address?: string }} value - The transaction's contract parameter value.
+     * @returns {Promise<boolean>} True if the transfer activates a new account.
+     */
+    protected _isActivatingTransfer(type?: string, value?: {
+        to_address?: string;
+    }): Promise<boolean>;
+    /**
+     * Estimates the energy cost of a smart contract call by re-simulating it from the
+     * built transaction's raw call data.
+     *
+     * @protected
+     * @param {{ contract_address: string, data: string, owner_address: string, call_value?: number }} value - The `TriggerSmartContract` parameter value.
+     * @returns {Promise<bigint>} The energy cost in SUN.
+     */
+    protected _estimateEnergyCost(value: {
+        contract_address: string;
+        data: string;
+        owner_address: string;
+        call_value?: number;
+    }): Promise<bigint>;
+    /**
+     * Computes the energy fee (in SUN) needed beyond the account's available staked energy.
+     *
+     * @protected
+     * @param {number} energyUsed - The energy consumed by the call.
+     * @param {TronAccountResources} resources - The sender's resource snapshot.
+     * @param {number} energyPrice - The energy price (in SUN).
+     * @returns {bigint} The energy cost in SUN.
+     */
+    protected _netEnergyCost(energyUsed: number, resources: TronAccountResources, energyPrice: number): bigint;
+    /**
      * Quotes the costs of TRC-20 transfer operation.
      * TRC-20 transfers do not incur an account activation fee.
      *
@@ -57,14 +123,19 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      */
     quoteTransfer(options: TransferOptions): Promise<Omit<TransferResult, "hash">>;
     /**
-     * Returns the fee of a send transaction operation.
+     * Estimates the energy and bandwidth fee of a smart contract call from a
+     * constant contract simulation result.
      *
      * @protected
-     * @param {string} to - The recipient's address.
-     * @param {Transaction} transaction - The transaction.
-     * @returns {Promise<Omit<TransactionResult, 'hash'> & TronActivationFee>} The transaction's fee in SUN.
+     * @param {Object} simulation - The result of a `triggerConstantContract` call.
+     * @param {Transaction} simulation.transaction - The simulated transaction.
+     * @param {number} [simulation.energy_used] - The estimated energy consumption.
+     * @returns {Promise<bigint>} The estimated fee in SUN.
      */
-    protected _getSendTrxFee(to: string, transaction: Transaction): Promise<Omit<TransactionResult, "hash"> & TronActivationFee>;
+    protected _estimateContractFee({ transaction, energy_used: energyUsed }: {
+        transaction: Transaction;
+        energy_used?: number;
+    }): Promise<bigint>;
     /**
      * Returns a transaction's receipt.
      *
@@ -90,12 +161,37 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     static initializeProvider(config: Omit<TronWalletConfig, "transferMaxFee" | "transactionMaxFee">): TronWeb | undefined;
 }
 export type Transaction = import("tronweb").Types.Transaction;
-export type AccountResourceMessage = import("tronweb").Types.AccountResourceMessage;
 export type TronTransactionReceipt = import("tronweb").Types.TransactionInfo;
+export type TronAccountResources = {
+    /**
+     * - The account's free bandwidth limit.
+     */
+    freeNetLimit?: number;
+    /**
+     * - The free bandwidth already used.
+     */
+    freeNetUsed?: number;
+    /**
+     * - The account's staked (frozen) bandwidth limit.
+     */
+    NetLimit?: number;
+    /**
+     * - The staked bandwidth already used.
+     */
+    NetUsed?: number;
+    /**
+     * - The account's staked energy limit.
+     */
+    EnergyLimit?: number;
+    /**
+     * - The staked energy already used.
+     */
+    EnergyUsed?: number;
+};
 export type TransactionResult = import("@tetherto/wdk-wallet").TransactionResult;
 export type TransferOptions = import("@tetherto/wdk-wallet").TransferOptions;
 export type TransferResult = import("@tetherto/wdk-wallet").TransferResult;
-export type TronTransaction = {
+export type TronTrxTransfer = {
     /**
      * - The transaction's recipient.
      */
@@ -105,6 +201,17 @@ export type TronTransaction = {
      */
     value: number | bigint;
 };
+export type TronBuilderCall = {
+    /**
+     * - The `tronWeb.transactionBuilder` method to invoke (e.g. 'triggerSmartContract', 'freezeBalanceV2'). See the API reference linked above.
+     */
+    method: string;
+    /**
+     * - The positional arguments passed to the builder method, in the order documented in the API reference (default: []).
+     */
+    args?: Array<unknown>;
+};
+export type TronTransaction = TronTrxTransfer | TronBuilderCall;
 export type TronWalletConfig = {
     /**
      * - The url of the tron web provider, or an instance of the {@link TronWeb} class. It's also possible to provide a list of urls or {@link TronWeb} instances instead. In such case, connection errors will cause the wallet to automatically fallback on the next provider in the list. When passing {@link TronWeb} instances, the first one becomes the wallet's primary client; the others contribute only their `fullNode` / `solidityNode` / `eventServer` to the failover pool.
@@ -137,7 +244,7 @@ export type TronBandwidthCostOptions = {
     /**
      * - Resource snapshot returned by `getAccountResources` for the sender.
      */
-    resources?: AccountResourceMessage;
+    resources?: TronAccountResources;
 };
 import { WalletAccountReadOnly } from '@tetherto/wdk-wallet';
 import { TronWeb } from 'tronweb';
