@@ -21,8 +21,8 @@ import FailoverProvider from '@tetherto/wdk-failover-provider'
 import { TronWeb, Trx } from 'tronweb'
 
 /** @typedef {import('tronweb').Types.Transaction} Transaction */
-/** @typedef {import('tronweb').Types.TransactionInfo} TronTransactionReceipt */
 /** @typedef {import('tronweb').Types.AccountResourceMessage} AccountResourceMessage */
+/** @typedef {import('tronweb').Types.TransactionInfo} TronTransactionReceipt */
 
 /** @typedef {import('@tetherto/wdk-wallet').TransactionResult} TransactionResult */
 /** @typedef {import('@tetherto/wdk-wallet').TransferOptions} TransferOptions */
