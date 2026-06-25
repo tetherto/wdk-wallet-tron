@@ -23,6 +23,8 @@ import { TronWeb, Trx } from 'tronweb'
 /** @typedef {import('tronweb').Types.Transaction} Transaction */
 /** @typedef {import('tronweb').Types.AccountResourceMessage} AccountResourceMessage */
 /** @typedef {import('tronweb').Types.TransactionInfo} TronTransactionReceipt */
+/** @typedef {import('tronweb').Types.TriggerSmartContractOptions} TriggerSmartContractOptions */
+/** @typedef {import('tronweb').Types.ContractFunctionParameter} ContractFunctionParameter */
 
 /** @typedef {import('@tetherto/wdk-wallet').TransactionResult} TransactionResult */
 /** @typedef {import('@tetherto/wdk-wallet').TransferOptions} TransferOptions */
@@ -37,22 +39,22 @@ import { TronWeb, Trx } from 'tronweb'
  */
 
 /**
- * A `tronWeb.transactionBuilder` call, used for smart contract calls and system
- * contracts (e.g. staking, voting).
+ * A smart contract call.
  *
- * The available `method` names and the positional `args` each one expects are listed in the
- * tron web transaction builder API reference:
- * {@link https://tronweb.network/docu/docs/API%20List/transactionBuilder/}.
- *
- * @typedef {Object} TronBuilderCall
- * @property {string} method - The `tronWeb.transactionBuilder` method to invoke (e.g. 'triggerSmartContract', 'freezeBalanceV2').
- * @property {Array<unknown>} [args] - The positional arguments for the method (default: []).
+ * @typedef {Object} TronSmartContractCall
+ * @property {string} contractAddress - The address of the smart contract to call.
+ * @property {string} functionSelector - The function selector to invoke (e.g. 'transfer(address,uint256)').
+ * @property {ContractFunctionParameter[]} [parameters] - The parameters to pass to the function (default: []).
+ * @property {TriggerSmartContractOptions} [options] - The trigger options (e.g. `feeLimit`, `callValue`).
  */
 
 /**
- * A native tronix transfer ({@link TronTrxTransfer}) or an arbitrary transaction builder call ({@link TronBuilderCall}).
+ * A transaction the wallet can send. One of:
+ * - a native tronix transfer ({@link TronTrxTransfer});
+ * - a smart contract call ({@link TronSmartContractCall});
+ * - a pre-built tron web transaction (as returned by `tronWeb.transactionBuilder.*`).
  *
- * @typedef {TronTrxTransfer | TronBuilderCall} TronTransaction
+ * @typedef {TronTrxTransfer | TronSmartContractCall | Transaction} TronTransaction
  */
 
 /**
@@ -77,6 +79,7 @@ import { TronWeb, Trx } from 'tronweb'
 const BANDWIDTH_PRICE = 1_000n
 const ACCOUNT_ACTIVATION_FEE_SUN = 1_000_000n
 const ACCOUNT_ACTIVATION_BANDWIDTH_COST = 100_000n
+const DEFAULT_FEE_LIMIT_SUN = 15_000_000
 /**
  * The length of an ECDSA signature in bytes.
  */
@@ -121,14 +124,26 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
   }
 
   /**
-   * Returns whether a transaction is a builder call.
+   * Returns whether a transaction is an already-built tron web transaction
+   * (as returned by `tronWeb.transactionBuilder.*`).
    *
    * @protected
    * @param {TronTransaction} tx - The transaction.
-   * @returns {boolean} True if the transaction is a builder call.
+   * @returns {boolean} True if the transaction is a pre-built tron web transaction.
    */
-  static _isBuilderCall (tx) {
-    return Boolean(tx && typeof tx.method === 'string')
+  static _isPrebuiltTransaction (tx) {
+    return Boolean(tx && tx.txID && tx.raw_data)
+  }
+
+  /**
+   * Returns whether a transaction is a smart contract call descriptor.
+   *
+   * @protected
+   * @param {TronTransaction} tx - The transaction.
+   * @returns {boolean} True if the transaction is a smart contract call.
+   */
+  static _isSmartContractCall (tx) {
+    return Boolean(tx && tx.contractAddress && tx.functionSelector)
   }
 
   /**
@@ -214,16 +229,19 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    * @returns {Promise<Transaction>} The unsigned tron web transaction.
    */
   async _buildTransaction (tx) {
-    if (WalletAccountReadOnlyTron._isBuilderCall(tx)) {
-      const builder = this._tronWeb.transactionBuilder
+    if (WalletAccountReadOnlyTron._isPrebuiltTransaction(tx)) {
+      return tx
+    }
 
-      if (typeof builder[tx.method] !== 'function') {
-        throw new Error(`Unknown tron web transaction builder method: '${tx.method}'.`)
-      }
+    if (WalletAccountReadOnlyTron._isSmartContractCall(tx)) {
+      const { contractAddress, functionSelector, parameters = [], options = {} } = tx
+      const address = await this.getAddress()
+      const addressHex = this._tronWeb.address.toHex(address)
 
-      const result = await builder[tx.method](...(tx.args ?? []))
+      const { transaction } = await this._tronWeb.transactionBuilder
+        .triggerSmartContract(contractAddress, functionSelector, { feeLimit: DEFAULT_FEE_LIMIT_SUN, ...options }, parameters, addressHex)
 
-      return result.transaction ?? result
+      return transaction
     }
 
     const { to, value } = tx

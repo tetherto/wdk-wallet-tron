@@ -237,14 +237,10 @@ describe('WalletAccountReadOnlyTron', () => {
     test('should quote a smart contract call (energy + bandwidth, no activation fee)', async () => {
       const CONTRACT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'
       const CALL = {
-        method: 'triggerSmartContract',
-        args: [
-          CONTRACT,
-          'approve(address,uint256)',
-          { feeLimit: 15_000_000 },
-          [{ type: 'address', value: TronWeb.address.toHex(RECIPIENT) }, { type: 'uint256', value: 100 }],
-          TronWeb.address.toHex(ADDRESS)
-        ]
+        contractAddress: CONTRACT,
+        functionSelector: 'approve(address,uint256)',
+        parameters: [{ type: 'address', value: RECIPIENT }, { type: 'uint256', value: 100 }],
+        options: { feeLimit: 15_000_000 }
       }
       // energy_used (10000) * energy price (420) = 4,200,000 SUN; bandwidth covered by the free limit
       const EXPECTED_FEE = 4_200_000n
@@ -284,6 +280,13 @@ describe('WalletAccountReadOnlyTron', () => {
 
       const { fee, activationFee } = await account.quoteSendTransaction(CALL)
 
+      expect(triggerSmartContractMock).toHaveBeenCalledWith(
+        CONTRACT,
+        'approve(address,uint256)',
+        { feeLimit: 15_000_000 },
+        CALL.parameters,
+        TronWeb.address.toHex(ADDRESS)
+      )
       expect(triggerConstantContractMock).toHaveBeenCalledWith(
         TronWeb.address.toHex(CONTRACT),
         '',
@@ -295,11 +298,8 @@ describe('WalletAccountReadOnlyTron', () => {
       expect(activationFee).toBe(0n)
     })
 
-    test('should quote a system contract (bandwidth only, no energy, no activation)', async () => {
-      const CALL = { method: 'freezeBalanceV2', args: [10_000_000, 'ENERGY', ADDRESS] }
-      const EXPECTED_FEE = 245_000n
-
-      freezeBalanceV2Mock.mockResolvedValue({
+    test('should quote a pre-built transaction (bandwidth only, no energy, no activation)', async () => {
+      const PREBUILT = {
         txID: 'freeze-tx-id',
         raw_data: {
           contract: [{
@@ -308,7 +308,8 @@ describe('WalletAccountReadOnlyTron', () => {
           }]
         },
         raw_data_hex: '0a' + '00'.repeat(100)
-      })
+      }
+      const EXPECTED_FEE = 245_000n
 
       getAccountResourcesMock.mockResolvedValue({
         freeNetLimit: 0,
@@ -317,18 +318,12 @@ describe('WalletAccountReadOnlyTron', () => {
         NetUsed: 0
       })
 
-      const { fee, activationFee } = await account.quoteSendTransaction(CALL)
+      const { fee, activationFee } = await account.quoteSendTransaction(PREBUILT)
 
-      expect(freezeBalanceV2Mock).toHaveBeenCalledWith(10_000_000, 'ENERGY', ADDRESS)
       expect(triggerConstantContractMock).not.toHaveBeenCalled()
       expect(getChainParametersMock).not.toHaveBeenCalled()
       expect(fee).toBe(EXPECTED_FEE)
       expect(activationFee).toBe(0n)
-    })
-
-    test('should throw for an unknown builder method', async () => {
-      await expect(account.quoteSendTransaction({ method: 'notARealMethod', args: [] }))
-        .rejects.toThrow("Unknown tron web transaction builder method: 'notARealMethod'.")
     })
 
     test('should throw if the account is not connected to tron web', async () => {

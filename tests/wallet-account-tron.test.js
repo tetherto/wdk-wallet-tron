@@ -280,14 +280,10 @@ describe('WalletAccountTron', () => {
     test('should successfully send a smart contract call', async () => {
       const CONTRACT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'
       const CALL = {
-        method: 'triggerSmartContract',
-        args: [
-          CONTRACT,
-          'approve(address,uint256)',
-          { feeLimit: 15_000_000 },
-          [{ type: 'address', value: TronWeb.address.toHex(RECIPIENT) }, { type: 'uint256', value: 100 }],
-          TronWeb.address.toHex(ACCOUNT.address)
-        ]
+        contractAddress: CONTRACT,
+        functionSelector: 'approve(address,uint256)',
+        parameters: [{ type: 'address', value: RECIPIENT }, { type: 'uint256', value: 100 }],
+        options: { feeLimit: 15_000_000 }
       }
       const DUMMY_TX_ID = 'contractcall123'
       // energy_used (10000) * energy price (420) = 4,200,000 SUN; bandwidth covered by the free limit
@@ -331,12 +327,11 @@ describe('WalletAccountTron', () => {
       expect(fee).toBe(EXPECTED_FEE)
       expect(activationFee).toBe(0n)
 
-      expect(triggerSmartContractMock).toHaveBeenCalledWith(...CALL.args)
-      expect(triggerConstantContractMock).toHaveBeenCalledWith(
-        TronWeb.address.toHex(CONTRACT),
-        '',
-        { input: 'deadbeef', callValue: 0 },
-        [],
+      expect(triggerSmartContractMock).toHaveBeenCalledWith(
+        CONTRACT,
+        'approve(address,uint256)',
+        { feeLimit: 15_000_000 },
+        CALL.parameters,
         TronWeb.address.toHex(ACCOUNT.address)
       )
       expect(sendRawTransactionMock).toHaveBeenCalledWith(
@@ -344,11 +339,8 @@ describe('WalletAccountTron', () => {
       )
     })
 
-    test('should successfully send a system contract (bandwidth only)', async () => {
-      const CALL = { method: 'freezeBalanceV2', args: [10_000_000, 'ENERGY', ACCOUNT.address] }
-      const EXPECTED_FEE = 245_000n
-
-      freezeBalanceV2Mock.mockResolvedValue({
+    test('should successfully send a pre-built transaction', async () => {
+      const PREBUILT = {
         txID: '12a406f767b30e00b317758aa25fcddc0ff8a329b7cad741dd204676d0e6c5ce',
         raw_data: {
           contract: [{
@@ -357,22 +349,25 @@ describe('WalletAccountTron', () => {
           }]
         },
         raw_data_hex: '0a' + '00'.repeat(100)
-      })
+      }
+      const EXPECTED_FEE = 245_000n
 
       sendRawTransactionMock.mockResolvedValue({ txid: 'freeze123' })
       getAccountResourcesMock.mockResolvedValue({ freeNetLimit: 0, freeNetUsed: 0, NetLimit: 0, NetUsed: 0 })
 
-      const { hash, fee, activationFee } = await account.sendTransaction(CALL)
+      const { hash, fee, activationFee } = await account.sendTransaction(PREBUILT)
 
       expect(hash).toBe('freeze123')
       expect(fee).toBe(EXPECTED_FEE)
       expect(activationFee).toBe(0n)
-      expect(freezeBalanceV2Mock).toHaveBeenCalledWith(10_000_000, 'ENERGY', ACCOUNT.address)
       expect(triggerConstantContractMock).not.toHaveBeenCalled()
+      expect(sendRawTransactionMock).toHaveBeenCalledWith(
+        expect.objectContaining({ signature: expect.any(Array) })
+      )
     })
 
     test('should throw if the transaction owner does not match the account', async () => {
-      freezeBalanceV2Mock.mockResolvedValue({
+      const PREBUILT = {
         txID: '12a406f767b30e00b317758aa25fcddc0ff8a329b7cad741dd204676d0e6c5ce',
         raw_data: {
           contract: [{
@@ -381,9 +376,9 @@ describe('WalletAccountTron', () => {
           }]
         },
         raw_data_hex: '0a' + '00'.repeat(100)
-      })
+      }
 
-      await expect(account.sendTransaction({ method: 'freezeBalanceV2', args: [10_000_000, 'ENERGY', RECIPIENT] }))
+      await expect(account.sendTransaction(PREBUILT))
         .rejects.toThrow('The transaction owner does not match the wallet account address.')
       expect(sendRawTransactionMock).not.toHaveBeenCalled()
     })

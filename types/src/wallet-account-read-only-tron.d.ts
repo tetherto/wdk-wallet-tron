@@ -21,13 +21,22 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      */
     protected _tronWeb: TronWeb | undefined;
     /**
-     * Returns whether a transaction is a builder call.
+     * Returns whether a transaction is an already-built tron web transaction
+     * (as returned by `tronWeb.transactionBuilder.*`).
      *
      * @protected
      * @param {TronTransaction} tx - The transaction.
-     * @returns {boolean} True if the transaction is a builder call.
+     * @returns {boolean} True if the transaction is a pre-built tron web transaction.
      */
-    protected static _isBuilderCall(tx: TronTransaction): boolean;
+    protected static _isPrebuiltTransaction(tx: TronTransaction): boolean;
+    /**
+     * Returns whether a transaction is a smart contract call descriptor.
+     *
+     * @protected
+     * @param {TronTransaction} tx - The transaction.
+     * @returns {boolean} True if the transaction is a smart contract call.
+     */
+    protected static _isSmartContractCall(tx: TronTransaction): boolean;
     /**
      * Verifies a message's signature.
      *
@@ -162,6 +171,8 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
 export type Transaction = import("tronweb").Types.Transaction;
 export type TronTransactionReceipt = import("tronweb").Types.TransactionInfo;
 export type AccountResourceMessage = import("tronweb").Types.AccountResourceMessage;
+export type TriggerSmartContractOptions = import("tronweb").Types.TriggerSmartContractOptions;
+export type ContractFunctionParameter = import("tronweb").Types.ContractFunctionParameter;
 export type TransactionResult = import("@tetherto/wdk-wallet").TransactionResult;
 export type TransferOptions = import("@tetherto/wdk-wallet").TransferOptions;
 export type TransferResult = import("@tetherto/wdk-wallet").TransferResult;
@@ -176,24 +187,27 @@ export type TronTrxTransfer = {
     value: number | bigint;
 };
 /**
- * A `tronWeb.transactionBuilder` call, used for smart contract calls and system
- * contracts (e.g. staking, voting).
- *
- * The available `method` names and the positional `args` each one expects are listed in the
- * tron web transaction builder API reference:
- * {@link https://tronweb.network/docu/docs/API%20List/transactionBuilder/}.
+ * A smart contract call.
  */
-export type TronBuilderCall = {
+export type TronSmartContractCall = {
     /**
-     * - The `tronWeb.transactionBuilder` method to invoke (e.g. 'triggerSmartContract', 'freezeBalanceV2').
+     * - The address of the smart contract to call.
      */
-    method: string;
+    contractAddress: string;
     /**
-     * - The positional arguments for the method (default: []).
+     * - The function selector to invoke (e.g. 'transfer(address,uint256)').
      */
-    args?: Array<unknown>;
+    functionSelector: string;
+    /**
+     * - The parameters to pass to the function (default: []).
+     */
+    parameters?: ContractFunctionParameter[];
+    /**
+     * - The trigger options (e.g. `feeLimit`, `callValue`).
+     */
+    options?: TriggerSmartContractOptions;
 };
-export type TronTransaction = TronTrxTransfer | TronBuilderCall;
+export type TronTransaction = TronTrxTransfer | TronSmartContractCall | Transaction;
 export type TronWalletConfig = {
     /**
      * - The url of the tron web provider, or an instance of the {@link TronWeb} class. It's also possible to provide a list of urls or {@link TronWeb} instances instead. In such case, connection errors will cause the wallet to automatically fallback on the next provider in the list. When passing {@link TronWeb} instances, the first one becomes the wallet's primary client; the others contribute only their `fullNode` / `solidityNode` / `eventServer` to the failover pool.
