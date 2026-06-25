@@ -39,6 +39,7 @@ import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js'
 /** @typedef {import('./wallet-account-read-only-tron.js').TronActivationFee} TronActivationFee */
 
 /** @typedef {import('tronweb').Types.SignedTransaction} SignedTransaction */
+/** @typedef {import('tronweb').Types.Transaction} Transaction */
 
 const BIP_44_TRON_DERIVATION_PATH_PREFIX = "m/44'/195'"
 const DEFAULT_FEE_LIMIT_SUN = 15_000_000
@@ -159,18 +160,21 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
   /**
    * Signs a transaction.
    *
+   * Accepts either a native tronix transfer (`{ to, value }`) or an arbitrary
+   * transaction builder call (`{ method, args }`).
+   *
    * @param {TronTransaction} tx - The transaction to sign.
    * @returns {Promise<SignedTransaction>} The signed transaction.
    * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
    */
-  async signTransaction ({ to, value }) {
+  async signTransaction (tx) {
     if (!this._tronWeb) {
       throw new Error('The wallet must be connected to tron web to sign transactions.')
     }
 
-    const address = await this.getAddress()
+    const transaction = await this._buildTransaction(tx)
 
-    const transaction = await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
+    await this._assertTransactionOwner(transaction)
 
     if (this._config.transactionMaxFee !== undefined) {
       const fee = await this._getBandwidthCost(transaction)
@@ -185,19 +189,23 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
   /**
    * Sends a transaction.
    *
+   * Accepts either a native tronix transfer (`{ to, value }`) or an arbitrary
+   * transaction builder call (`{ method, args }`).
+   *
    * @param {TronTransaction} tx - The transaction.
    * @returns {Promise<TransactionResult & TronActivationFee>} The transaction's result.
    * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
    */
-  async sendTransaction ({ to, value }) {
+  async sendTransaction (tx) {
     if (!this._tronWeb) {
       throw new Error('The wallet must be connected to tron web to send transactions.')
     }
 
-    const address = await this.getAddress()
+    const transaction = await this._buildTransaction(tx)
 
-    const transaction = await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
-    const { fee, activationFee } = await this._getSendTrxFee(to, transaction)
+    await this._assertTransactionOwner(transaction)
+
+    const { fee, activationFee } = await this._quoteTransaction(transaction)
 
     if (this._config.transactionMaxFee !== undefined && BigInt(fee) > BigInt(this._config.transactionMaxFee)) {
       throw new Error('Exceeded maximum fee cost for transaction operation.')
@@ -208,6 +216,25 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
     const { txid } = await this._tronWeb.trx.sendRawTransaction(signedTransaction)
 
     return { hash: txid, fee, activationFee }
+  }
+
+  /**
+   * Asserts that a built transaction is owned by this wallet account, to avoid
+   * signing a transaction that operates on a different account.
+   *
+   * @private
+   * @param {Transaction} transaction - The unsigned tron web transaction.
+   * @throws {Error} If the transaction's owner address does not match the account.
+   */
+  async _assertTransactionOwner (transaction) {
+    const address = await this.getAddress()
+    const ownerHex = this._tronWeb.address.toHex(address).toLowerCase()
+
+    const txOwner = transaction.raw_data?.contract?.[0]?.parameter?.value?.owner_address
+
+    if (txOwner && txOwner.toLowerCase() !== ownerHex) {
+      throw new Error('The transaction owner does not match the wallet account address.')
+    }
   }
 
   /**
