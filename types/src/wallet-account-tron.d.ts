@@ -64,11 +64,11 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron impleme
     /**
      * Sends a transaction.
      *
-     * @param {TronTransaction} tx - The transaction.
+     * @param {TronTransaction | SignedTransaction} tx - The transaction, or a signed transaction.
      * @returns {Promise<TransactionResult & TronActivationFee>} The transaction's result.
      * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
      */
-    sendTransaction(tx: TronTransaction): Promise<TransactionResult & TronActivationFee>;
+    sendTransaction(tx: TronTransaction | SignedTransaction): Promise<TransactionResult & TronActivationFee>;
     /**
      * Transfers a TRC-20 token to another address.
      * TRC-20 transfers do not incur an account activation fee.
