@@ -21,6 +21,7 @@ import FailoverProvider from '@tetherto/wdk-failover-provider'
 import { TronWeb, Trx } from 'tronweb'
 
 /** @typedef {import('tronweb').Types.Transaction} Transaction */
+/** @typedef {import('tronweb').Types.SignedTransaction} SignedTransaction */
 /** @typedef {import('tronweb').Types.AccountResourceMessage} AccountResourceMessage */
 /** @typedef {import('tronweb').Types.TransactionInfo} TronTransactionReceipt */
 
@@ -157,13 +158,21 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
   /**
    * Quotes the costs of a send transaction operation.
    *
-   * @param {TronTransaction} tx - The transaction.
+   * @param {TronTransaction | SignedTransaction} tx - The transaction, or a signed transaction.
    * @returns {Promise<Omit<TransactionResult, 'hash'> & TronActivationFee>} The transaction's quotes.
    */
-  async quoteSendTransaction ({ to, value }) {
+  async quoteSendTransaction (tx) {
     if (!this._tronWeb) {
       throw new Error('The wallet must be connected to tron web to quote transactions.')
     }
+
+    if (tx.txID) {
+      const to = this._tronWeb.address.fromHex(tx.raw_data.contract[0].parameter.value.to_address)
+
+      return await this._getSendTrxFee(to, tx)
+    }
+
+    const { to, value } = tx
 
     const address = await this.getAddress()
 

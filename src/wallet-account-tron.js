@@ -185,25 +185,37 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
   /**
    * Sends a transaction.
    *
-   * @param {TronTransaction} tx - The transaction.
+   * @param {TronTransaction | SignedTransaction} tx - The transaction, or a signed transaction.
    * @returns {Promise<TransactionResult & TronActivationFee>} The transaction's result.
    * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
    */
-  async sendTransaction ({ to, value }) {
+  async sendTransaction (tx) {
     if (!this._tronWeb) {
       throw new Error('The wallet must be connected to tron web to send transactions.')
     }
 
-    const address = await this.getAddress()
+    const isSigned = Boolean(tx.txID)
 
-    const transaction = await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
-    const { fee, activationFee } = await this._getSendTrxFee(to, transaction)
+    let transaction, quote
+
+    if (isSigned) {
+      quote = await this.quoteSendTransaction(tx)
+    } else {
+      const { to, value } = tx
+
+      const address = await this.getAddress()
+
+      transaction = await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
+      quote = await this._getSendTrxFee(to, transaction)
+    }
+
+    const { fee, activationFee } = quote
 
     if (this._config.transactionMaxFee !== undefined && BigInt(fee) > BigInt(this._config.transactionMaxFee)) {
       throw new Error('Exceeded maximum fee cost for transaction operation.')
     }
 
-    const signedTransaction = await this._signTransaction(transaction)
+    const signedTransaction = isSigned ? tx : await this._signTransaction(transaction)
 
     const { txid } = await this._tronWeb.trx.sendRawTransaction(signedTransaction)
 
