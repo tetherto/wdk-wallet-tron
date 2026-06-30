@@ -286,7 +286,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    * recipient account (which incurs the account activation fee).
    *
    * @protected
-   * @param {string} [type] - The transaction's contract type.
+   * @param {string | undefined} type - The transaction's contract type.
    * @param {{ to_address?: string }} value - The transaction's contract parameter value.
    * @returns {Promise<boolean>} True if the transfer activates a new account.
    */
