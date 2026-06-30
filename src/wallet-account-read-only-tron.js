@@ -52,7 +52,7 @@ import { TronWeb, Trx } from 'tronweb'
  * A transaction the wallet can send. One of:
  * - a native tronix transfer ({@link TronTrxTransfer});
  * - a smart contract call ({@link TronSmartContractCall});
- * - a pre-built tron web transaction (as returned by `tronWeb.transactionBuilder.*`).
+ * - a pre-built tron web transaction.
  *
  * @typedef {TronTrxTransfer | TronSmartContractCall | Transaction} TronTransaction
  */
