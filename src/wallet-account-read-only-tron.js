@@ -331,11 +331,11 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    *
    * @protected
    * @param {number} energyUsed - The energy consumed by the call.
-   * @param {AccountResourceMessage} resources - The sender's resource snapshot.
    * @param {number} energyPrice - The energy price (in SUN).
+   * @param {AccountResourceMessage} resources - The sender's resource snapshot.
    * @returns {bigint} The energy cost in SUN.
    */
-  _netEnergyCost (energyUsed, resources, energyPrice) {
+  _netEnergyCost (energyUsed, energyPrice, resources) {
     const availableEnergy = BigInt(resources.EnergyLimit || 0) - BigInt(resources.EnergyUsed || 0)
 
     // We ignore contract-level sponsorship (consume_user_resource_percent) as it depends
