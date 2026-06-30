@@ -60,7 +60,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron impleme
      * @returns {Promise<SignedTransaction>} The signed transaction.
      * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
      */
-    signTransaction({ to, value }: TronTransaction): Promise<SignedTransaction>;
+    signTransaction(tx: TronTransaction): Promise<SignedTransaction>;
     /**
      * Sends a transaction.
      *
@@ -69,6 +69,15 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron impleme
      * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
      */
     sendTransaction(tx: TronTransaction): Promise<TransactionResult & TronActivationFee>;
+    /**
+     * Asserts that a built transaction is owned by this wallet account, to avoid
+     * signing a transaction that operates on a different account.
+     *
+     * @private
+     * @param {Transaction} transaction - The unsigned tron web transaction.
+     * @throws {Error} If the transaction's owner address does not match the account.
+     */
+    private _assertTransactionOwner;
     /**
      * Transfers a TRC-20 token to another address.
      * TRC-20 transfers do not incur an account activation fee.
@@ -100,5 +109,6 @@ export type TronTransaction = import("./wallet-account-read-only-tron.js").TronT
 export type TronWalletConfig = import("./wallet-account-read-only-tron.js").TronWalletConfig;
 export type TronActivationFee = import("./wallet-account-read-only-tron.js").TronActivationFee;
 export type SignedTransaction = import("tronweb").Types.SignedTransaction;
+export type Transaction = import("tronweb").Types.Transaction;
 import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js';
 import { HDKey } from '@scure/bip32';
