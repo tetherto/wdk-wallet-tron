@@ -66,8 +66,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      */
     quoteSendTransaction(tx: TronTransaction): Promise<Omit<TransactionResult, "hash"> & TronActivationFee>;
     /**
-     * Builds an unsigned tron web transaction from a native tronix transfer
-     * (`{ to, value }`) or a transaction builder call (`{ method, args }`).
+     * Builds an unsigned tron web transaction from the given transaction.
      *
      * @protected
      * @param {TronTransaction} tx - The transaction.
@@ -91,11 +90,11 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      * recipient account (which incurs the account activation fee).
      *
      * @protected
-     * @param {string} [type] - The transaction's contract type.
+     * @param {string | undefined} type - The transaction's contract type.
      * @param {{ to_address?: string }} value - The transaction's contract parameter value.
      * @returns {Promise<boolean>} True if the transfer activates a new account.
      */
-    protected _isActivatingTransfer(type?: string, value?: {
+    protected _isActivatingTransfer(type: string | undefined, value: {
         to_address?: string;
     }): Promise<boolean>;
     /**
@@ -103,25 +102,20 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      * built transaction's raw call data.
      *
      * @protected
-     * @param {{ contract_address: string, data: string, owner_address: string, call_value?: number }} value - The `TriggerSmartContract` parameter value.
+     * @param {EstimateEnergyCostValue} value - The `TriggerSmartContract` parameter value.
      * @returns {Promise<bigint>} The energy cost in SUN.
      */
-    protected _estimateEnergyCost(value: {
-        contract_address: string;
-        data: string;
-        owner_address: string;
-        call_value?: number;
-    }): Promise<bigint>;
+    protected _estimateEnergyCost(value: EstimateEnergyCostValue): Promise<bigint>;
     /**
      * Computes the energy fee (in SUN) needed beyond the account's available staked energy.
      *
      * @protected
      * @param {number} energyUsed - The energy consumed by the call.
-     * @param {AccountResourceMessage} resources - The sender's resource snapshot.
      * @param {number} energyPrice - The energy price (in SUN).
+     * @param {AccountResourceMessage} resources - The sender's resource snapshot.
      * @returns {bigint} The energy cost in SUN.
      */
-    protected _netEnergyCost(energyUsed: number, resources: AccountResourceMessage, energyPrice: number): bigint;
+    protected _netEnergyCost(energyUsed: number, energyPrice: number, resources: AccountResourceMessage): bigint;
     /**
      * Quotes the costs of TRC-20 transfer operation.
      * TRC-20 transfers do not incur an account activation fee.
@@ -241,6 +235,27 @@ export type TronBandwidthCostOptions = {
      * - Resource snapshot returned by `getAccountResources` for the sender.
      */
     resources?: AccountResourceMessage;
+};
+/**
+ * The `TriggerSmartContract` parameter value used to estimate a smart contract call's energy cost.
+ */
+export type EstimateEnergyCostValue = {
+    /**
+     * - The smart contract address (hex).
+     */
+    contract_address: string;
+    /**
+     * - The encoded call data.
+     */
+    data: string;
+    /**
+     * - The caller's address (hex).
+     */
+    owner_address: string;
+    /**
+     * - The amount of tronixs (in suns) sent along with the call.
+     */
+    call_value?: number;
 };
 import { WalletAccountReadOnly } from '@tetherto/wdk-wallet';
 import { TronWeb } from 'tronweb';

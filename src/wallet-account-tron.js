@@ -160,9 +160,6 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
   /**
    * Signs a transaction.
    *
-   * Accepts either a native tronix transfer (`{ to, value }`) or an arbitrary
-   * transaction builder call (`{ method, args }`).
-   *
    * @param {TronTransaction} tx - The transaction to sign.
    * @returns {Promise<SignedTransaction>} The signed transaction.
    * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
@@ -177,8 +174,8 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
     await this._assertTransactionOwner(transaction)
 
     if (this._config.transactionMaxFee !== undefined) {
-      const fee = await this._getBandwidthCost(transaction)
-      if (BigInt(fee) > this._config.transactionMaxFee) {
+      const { fee } = await this._quoteTransaction(transaction)
+      if (BigInt(fee) > BigInt(this._config.transactionMaxFee)) {
         throw new Error('Exceeded maximum fee cost for transaction operation.')
       }
     }
@@ -188,9 +185,6 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
 
   /**
    * Sends a transaction.
-   *
-   * Accepts either a native tronix transfer (`{ to, value }`) or an arbitrary
-   * transaction builder call (`{ method, args }`).
    *
    * @param {TronTransaction} tx - The transaction.
    * @returns {Promise<TransactionResult & TronActivationFee>} The transaction's result.

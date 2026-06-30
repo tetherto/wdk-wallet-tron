@@ -64,10 +64,5 @@
       "bare.js",
       "tests/**/*.js"
     ]
-  },
-  "jest": {
-    "testMatch": [
-      "**/tests/**/*.test.js"
-    ]
   }
 }

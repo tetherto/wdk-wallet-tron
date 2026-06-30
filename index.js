@@ -23,9 +23,12 @@
 /** @typedef {import('@tetherto/wdk-wallet').TransferResult} TransferResult */
 
 /** @typedef {import('./src/wallet-account-read-only-tron.js').TronTransaction} TronTransaction */
+/** @typedef {import('./src/wallet-account-read-only-tron.js').TronTrxTransfer} TronTrxTransfer */
 /** @typedef {import('./src/wallet-account-read-only-tron.js').TronSmartContractCall} TronSmartContractCall */
+/** @typedef {import('./src/wallet-account-read-only-tron.js').Transaction} Transaction */
 /** @typedef {import('./src/wallet-account-read-only-tron.js').ContractFunctionParameter} ContractFunctionParameter */
 /** @typedef {import('./src/wallet-account-read-only-tron.js').TriggerSmartContractOptions} TriggerSmartContractOptions */
+/** @typedef {import('./src/wallet-account-read-only-tron.js').EstimateEnergyCostValue} EstimateEnergyCostValue */
 /** @typedef {import('./src/wallet-account-read-only-tron.js').TronWalletConfig} TronWalletConfig */
 /** @typedef {import('./src/wallet-account-read-only-tron.js').TronActivationFee} TronActivationFee */
 

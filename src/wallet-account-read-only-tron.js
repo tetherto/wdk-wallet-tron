@@ -76,6 +76,16 @@ import { TronWeb, Trx } from 'tronweb'
  * @property {AccountResourceMessage} [resources] - Resource snapshot returned by `getAccountResources` for the sender.
  */
 
+/**
+ * The `TriggerSmartContract` parameter value used to estimate a smart contract call's energy cost.
+ *
+ * @typedef {Object} EstimateEnergyCostValue
+ * @property {string} contract_address - The smart contract address (hex).
+ * @property {string} data - The encoded call data.
+ * @property {string} owner_address - The caller's address (hex).
+ * @property {number} [call_value] - The amount of tronixs (in suns) sent along with the call.
+ */
+
 const BANDWIDTH_PRICE = 1_000n
 const ACCOUNT_ACTIVATION_FEE_SUN = 1_000_000n
 const ACCOUNT_ACTIVATION_BANDWIDTH_COST = 100_000n
@@ -132,7 +142,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    * @returns {boolean} True if the transaction is a pre-built tron web transaction.
    */
   static _isPrebuiltTransaction (tx) {
-    return Boolean(tx && tx.txID && tx.raw_data)
+    return !!tx.txID
   }
 
   /**
@@ -143,7 +153,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    * @returns {boolean} True if the transaction is a smart contract call.
    */
   static _isSmartContractCall (tx) {
-    return Boolean(tx && tx.contractAddress && tx.functionSelector)
+    return !!tx.functionSelector
   }
 
   /**
@@ -204,9 +214,6 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
   /**
    * Quotes the costs of a send transaction operation.
    *
-   * Accepts either a native tronix transfer (`{ to, value }`) or an arbitrary
-   * transaction builder call (`{ method, args }`).
-   *
    * @param {TronTransaction} tx - The transaction.
    * @returns {Promise<Omit<TransactionResult, 'hash'> & TronActivationFee>} The transaction's quotes.
    */
@@ -221,8 +228,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
   }
 
   /**
-   * Builds an unsigned tron web transaction from a native tronix transfer
-   * (`{ to, value }`) or a transaction builder call (`{ method, args }`).
+   * Builds an unsigned tron web transaction from the given transaction.
    *
    * @protected
    * @param {TronTransaction} tx - The transaction.
@@ -309,7 +315,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    * built transaction's raw call data.
    *
    * @protected
-   * @param {{ contract_address: string, data: string, owner_address: string, call_value?: number }} value - The `TriggerSmartContract` parameter value.
+   * @param {EstimateEnergyCostValue} value - The `TriggerSmartContract` parameter value.
    * @returns {Promise<bigint>} The energy cost in SUN.
    */
   async _estimateEnergyCost ({ contract_address: contractAddress, data, owner_address: ownerAddress, call_value: callValue = 0 }) {
@@ -323,7 +329,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
 
     const { value: energyPrice } = chainParameters.find(({ key }) => key === 'getEnergyFee')
 
-    return this._netEnergyCost(energyUsed, resources, energyPrice)
+    return this._netEnergyCost(energyUsed, energyPrice, resources)
   }
 
   /**
@@ -405,7 +411,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
 
     const { value: energyPrice } = chainParameters.find(({ key }) => key === 'getEnergyFee')
 
-    const totalEnergyCost = this._netEnergyCost(energyUsed, resources, energyPrice)
+    const totalEnergyCost = this._netEnergyCost(energyUsed, energyPrice, resources)
 
     const bandwidthCost = await this._getBandwidthCost(transaction, { isActivation: false, resources })
 
