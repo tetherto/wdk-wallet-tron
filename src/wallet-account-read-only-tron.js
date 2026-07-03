@@ -23,15 +23,38 @@ import { TronWeb, Trx } from 'tronweb'
 /** @typedef {import('tronweb').Types.Transaction} Transaction */
 /** @typedef {import('tronweb').Types.AccountResourceMessage} AccountResourceMessage */
 /** @typedef {import('tronweb').Types.TransactionInfo} TronTransactionReceipt */
+/** @typedef {import('tronweb').Types.TriggerSmartContractOptions} TriggerSmartContractOptions */
+/** @typedef {import('tronweb').Types.ContractFunctionParameter} ContractFunctionParameter */
 
 /** @typedef {import('@tetherto/wdk-wallet').TransactionResult} TransactionResult */
 /** @typedef {import('@tetherto/wdk-wallet').TransferOptions} TransferOptions */
 /** @typedef {import('@tetherto/wdk-wallet').TransferResult} TransferResult */
 
 /**
- * @typedef {Object} TronTransaction
+ * A native tronix (TRX) transfer.
+ *
+ * @typedef {Object} TronTrxTransfer
  * @property {string} to - The transaction's recipient.
  * @property {number | bigint} value - The amount of tronixs to send to the recipient (in suns).
+ */
+
+/**
+ * A smart contract call.
+ *
+ * @typedef {Object} TronSmartContractCall
+ * @property {string} contractAddress - The address of the smart contract to call.
+ * @property {string} functionSelector - The function selector to invoke (e.g. 'transfer(address,uint256)').
+ * @property {ContractFunctionParameter[]} [parameters] - The parameters to pass to the function (default: []).
+ * @property {TriggerSmartContractOptions} [options] - The trigger options (e.g. `feeLimit`, `callValue`).
+ */
+
+/**
+ * A transaction the wallet can send. One of:
+ * - a native tronix transfer ({@link TronTrxTransfer});
+ * - a smart contract call ({@link TronSmartContractCall});
+ * - a pre-built tron web transaction.
+ *
+ * @typedef {TronTrxTransfer | TronSmartContractCall | Transaction} TronTransaction
  */
 
 /**
@@ -53,9 +76,20 @@ import { TronWeb, Trx } from 'tronweb'
  * @property {AccountResourceMessage} [resources] - Resource snapshot returned by `getAccountResources` for the sender.
  */
 
+/**
+ * The `TriggerSmartContract` parameter value used to estimate a smart contract call's energy cost.
+ *
+ * @typedef {Object} EstimateEnergyCostValue
+ * @property {string} contract_address - The smart contract address (hex).
+ * @property {string} data - The encoded call data.
+ * @property {string} owner_address - The caller's address (hex).
+ * @property {number} [call_value] - The amount of tronixs (in suns) sent along with the call.
+ */
+
 const BANDWIDTH_PRICE = 1_000n
 const ACCOUNT_ACTIVATION_FEE_SUN = 1_000_000n
 const ACCOUNT_ACTIVATION_BANDWIDTH_COST = 100_000n
+const DEFAULT_FEE_LIMIT_SUN = 15_000_000
 /**
  * The length of an ECDSA signature in bytes.
  */
@@ -97,6 +131,29 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      * @type {TronWeb | undefined}
      */
     this._tronWeb = WalletAccountReadOnlyTron.initializeProvider(config)
+  }
+
+  /**
+   * Returns whether a transaction is an already-built tron web transaction
+   * (as returned by `tronWeb.transactionBuilder.*`).
+   *
+   * @protected
+   * @param {TronTransaction} tx - The transaction.
+   * @returns {boolean} True if the transaction is a pre-built tron web transaction.
+   */
+  static _isPrebuiltTransaction (tx) {
+    return !!tx.txID
+  }
+
+  /**
+   * Returns whether a transaction is a smart contract call descriptor.
+   *
+   * @protected
+   * @param {TronTransaction} tx - The transaction.
+   * @returns {boolean} True if the transaction is a smart contract call.
+   */
+  static _isSmartContractCall (tx) {
+    return !!tx.functionSelector
   }
 
   /**
@@ -160,16 +217,138 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    * @param {TronTransaction} tx - The transaction.
    * @returns {Promise<Omit<TransactionResult, 'hash'> & TronActivationFee>} The transaction's quotes.
    */
-  async quoteSendTransaction ({ to, value }) {
+  async quoteSendTransaction (tx) {
     if (!this._tronWeb) {
       throw new Error('The wallet must be connected to tron web to quote transactions.')
     }
 
+    const transaction = await this._buildTransaction(tx)
+
+    return await this._quoteTransaction(transaction)
+  }
+
+  /**
+   * Builds an unsigned tron web transaction from the given transaction.
+   *
+   * @protected
+   * @param {TronTransaction} tx - The transaction.
+   * @returns {Promise<Transaction>} The unsigned tron web transaction.
+   */
+  async _buildTransaction (tx) {
+    if (WalletAccountReadOnlyTron._isPrebuiltTransaction(tx)) {
+      return tx
+    }
+
+    if (WalletAccountReadOnlyTron._isSmartContractCall(tx)) {
+      const { contractAddress, functionSelector, parameters = [], options = {} } = tx
+      const address = await this.getAddress()
+      const addressHex = this._tronWeb.address.toHex(address)
+
+      const { transaction } = await this._tronWeb.transactionBuilder
+        .triggerSmartContract(contractAddress, functionSelector, { feeLimit: DEFAULT_FEE_LIMIT_SUN, ...options }, parameters, addressHex)
+
+      return transaction
+    }
+
+    const { to, value } = tx
     const address = await this.getAddress()
 
-    const transaction = await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
+    return await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
+  }
 
-    return await this._getSendTrxFee(to, transaction)
+  /**
+   * Quotes the fee of an already-built tron web transaction. The fee is derived from
+   * the transaction's contract type, so this works for every kind of transaction:
+   * - bandwidth: applies to every transaction (derived from its serialized size);
+   * - energy: only smart contract execution (`TriggerSmartContract`) consumes it;
+   * - activation: only native value transfers to a not-yet-activated recipient.
+   *
+   * @protected
+   * @param {Transaction} transaction - The unsigned tron web transaction.
+   * @returns {Promise<Omit<TransactionResult, 'hash'> & TronActivationFee>} The transaction's quotes.
+   */
+  async _quoteTransaction (transaction) {
+    const contract = transaction.raw_data?.contract?.[0]
+    const type = contract?.type
+    const value = contract?.parameter?.value ?? {}
+
+    const isActivation = await this._isActivatingTransfer(type, value)
+    const activationFee = isActivation ? ACCOUNT_ACTIVATION_FEE_SUN : 0n
+
+    const energyCost = type === 'TriggerSmartContract'
+      ? await this._estimateEnergyCost(value)
+      : 0n
+
+    const bandwidthCost = await this._getBandwidthCost(transaction, { isActivation })
+
+    return {
+      fee: bandwidthCost + energyCost + activationFee,
+      activationFee
+    }
+  }
+
+  /**
+   * Returns whether a transaction is a native value transfer to a not-yet-activated
+   * recipient account (which incurs the account activation fee).
+   *
+   * @protected
+   * @param {string | undefined} type - The transaction's contract type.
+   * @param {{ to_address?: string }} value - The transaction's contract parameter value.
+   * @returns {Promise<boolean>} True if the transfer activates a new account.
+   */
+  async _isActivatingTransfer (type, { to_address: toAddress }) {
+    if (type !== 'TransferContract' && type !== 'TransferAssetContract') {
+      return false
+    }
+
+    if (!toAddress) {
+      return false
+    }
+
+    const recipientAccount = await this._tronWeb.trx.getAccount(toAddress)
+
+    return Object.keys(recipientAccount).length === 0
+  }
+
+  /**
+   * Estimates the energy cost of a smart contract call by re-simulating it from the
+   * built transaction's raw call data.
+   *
+   * @protected
+   * @param {EstimateEnergyCostValue} value - The `TriggerSmartContract` parameter value.
+   * @returns {Promise<bigint>} The energy cost in SUN.
+   */
+  async _estimateEnergyCost ({ contract_address: contractAddress, data, owner_address: ownerAddress, call_value: callValue = 0 }) {
+    const { energy_used: energyUsed } = await this._tronWeb.transactionBuilder
+      .triggerConstantContract(contractAddress, '', { input: data, callValue }, [], ownerAddress)
+
+    const [chainParameters, resources] = await Promise.all([
+      this._tronWeb.trx.getChainParameters(),
+      this._tronWeb.trx.getAccountResources(await this.getAddress())
+    ])
+
+    const { value: energyPrice } = chainParameters.find(({ key }) => key === 'getEnergyFee')
+
+    return this._netEnergyCost(energyUsed, energyPrice, resources)
+  }
+
+  /**
+   * Computes the energy fee (in SUN) needed beyond the account's available staked energy.
+   *
+   * @protected
+   * @param {number} energyUsed - The energy consumed by the call.
+   * @param {number} energyPrice - The energy price (in SUN).
+   * @param {AccountResourceMessage} resources - The sender's resource snapshot.
+   * @returns {bigint} The energy cost in SUN.
+   */
+  _netEnergyCost (energyUsed, energyPrice, resources) {
+    const availableEnergy = BigInt(resources.EnergyLimit || 0) - BigInt(resources.EnergyUsed || 0)
+
+    // We ignore contract-level sponsorship (consume_user_resource_percent) as it depends
+    // on real-time factors, ensuring our fee estimate remains the safest.
+    const energyNeeded = BigInt(energyUsed || 0n) - availableEnergy
+
+    return energyNeeded > 0n ? energyNeeded * BigInt(energyPrice) : 0n
   }
 
   /**
@@ -207,7 +386,23 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
       throw error
     }
 
-    const { transaction, energy_used: energyUsed } = simulation
+    return {
+      fee: await this._estimateContractFee(simulation)
+    }
+  }
+
+  /**
+   * Estimates the energy and bandwidth fee of a smart contract call from a
+   * constant contract simulation result.
+   *
+   * @protected
+   * @param {Object} simulation - The result of a `triggerConstantContract` call.
+   * @param {Transaction} simulation.transaction - The simulated transaction.
+   * @param {number} [simulation.energy_used] - The estimated energy consumption.
+   * @returns {Promise<bigint>} The estimated fee in SUN.
+   */
+  async _estimateContractFee ({ transaction, energy_used: energyUsed }) {
+    const address = await this.getAddress()
 
     const [chainParameters, resources] = await Promise.all([
       this._tronWeb.trx.getChainParameters(),
@@ -216,41 +411,11 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
 
     const { value: energyPrice } = chainParameters.find(({ key }) => key === 'getEnergyFee')
 
-    const availableEnergy = BigInt(resources.EnergyLimit || 0) - BigInt(resources.EnergyUsed || 0)
-
-    // We ignore contract-level sponsorship (consume_user_resource_percent) as it depends
-    // on real-time factors, ensuring our fee estimate remains the safest.
-    const energyNeeded = BigInt(energyUsed || 0n) - availableEnergy
-    const totalEnergyCost = energyNeeded > 0n ? energyNeeded * BigInt(energyPrice) : 0n
+    const totalEnergyCost = this._netEnergyCost(energyUsed, energyPrice, resources)
 
     const bandwidthCost = await this._getBandwidthCost(transaction, { isActivation: false, resources })
 
-    return {
-      fee: totalEnergyCost + bandwidthCost
-    }
-  }
-
-  /**
-   * Returns the fee of a send transaction operation.
-   *
-   * @protected
-   * @param {string} to - The recipient's address.
-   * @param {Transaction} transaction - The transaction.
-   * @returns {Promise<Omit<TransactionResult, 'hash'> & TronActivationFee>} The transaction's fee in SUN.
-   */
-  async _getSendTrxFee (to, transaction) {
-    const recipientAccount = await this._tronWeb.trx.getAccount(to)
-    const isActivation = Object.keys(recipientAccount).length === 0
-    const activationFee = isActivation
-      ? ACCOUNT_ACTIVATION_FEE_SUN
-      : 0n
-
-    const bandwidthCost = await this._getBandwidthCost(transaction, { isActivation })
-
-    return {
-      fee: bandwidthCost + activationFee,
-      activationFee
-    }
+    return totalEnergyCost + bandwidthCost
   }
 
   /**
