@@ -57,7 +57,7 @@ function getTronAddress (publicKey) {
   return address
 }
 
-/** @implements {IWalletAccount} */
+/** @implements {IWalletAccount<SignedTransaction>} */
 export default class WalletAccountTron extends WalletAccountReadOnlyTron {
   /**
    * Creates a new tron wallet account.
@@ -180,6 +180,26 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
     }
 
     return await this._signTransaction(transaction)
+  }
+
+  /**
+   * Quotes the costs of a send transaction operation.
+   *
+   * @param {TronTransaction | SignedTransaction} tx - The transaction, or a signed transaction.
+   * @returns {Promise<Omit<TransactionResult, 'hash'> & TronActivationFee>} The transaction's quotes.
+   */
+  async quoteSendTransaction (tx) {
+    if (tx.txID) {
+      if (!this._tronWeb) {
+        throw new Error('The wallet must be connected to tron web to quote transactions.')
+      }
+
+      const to = this._tronWeb.address.fromHex(tx.raw_data.contract[0].parameter.value.to_address)
+
+      return await this._getSendTrxFee(to, tx)
+    }
+
+    return await super.quoteSendTransaction(tx)
   }
 
   /**

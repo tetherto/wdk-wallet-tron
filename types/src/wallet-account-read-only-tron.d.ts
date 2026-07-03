@@ -44,10 +44,10 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     /**
      * Quotes the costs of a send transaction operation.
      *
-     * @param {TronTransaction | SignedTransaction} tx - The transaction, or a signed transaction.
+     * @param {TronTransaction} tx - The transaction.
      * @returns {Promise<Omit<TransactionResult, 'hash'> & TronActivationFee>} The transaction's quotes.
      */
-    quoteSendTransaction(tx: TronTransaction | SignedTransaction): Promise<Omit<TransactionResult, "hash"> & TronActivationFee>;
+    quoteSendTransaction(tx: TronTransaction): Promise<Omit<TransactionResult, "hash"> & TronActivationFee>;
     /**
      * Quotes the costs of TRC-20 transfer operation.
      * TRC-20 transfers do not incur an account activation fee.
@@ -123,7 +123,6 @@ export type TronWalletConfig = {
      */
     transactionMaxFee?: number | bigint;
 };
-export type SignedTransaction = import("tronweb").Types.SignedTransaction;
 export type TronActivationFee = {
     /**
      * - The portion of the fee used for account activation.

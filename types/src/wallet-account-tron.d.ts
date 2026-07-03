@@ -1,5 +1,5 @@
 /** @implements {IWalletAccount} */
-export default class WalletAccountTron extends WalletAccountReadOnlyTron implements IWalletAccount {
+export default class WalletAccountTron extends WalletAccountReadOnlyTron implements IWalletAccount<SignedTransaction> {
     /**
      * Creates a new tron wallet account.
      *
@@ -61,6 +61,13 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron impleme
      * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
      */
     signTransaction({ to, value }: TronTransaction): Promise<SignedTransaction>;
+    /**
+     * Quotes the costs of a send transaction operation.
+     *
+     * @param {TronTransaction | SignedTransaction} tx - The transaction, or a signed transaction.
+     * @returns {Promise<Omit<TransactionResult, 'hash'> & TronActivationFee>} The transaction's quotes.
+     */
+    quoteSendTransaction(tx: TronTransaction | SignedTransaction): Promise<Omit<TransactionResult, "hash"> & TronActivationFee>;
     /**
      * Sends a transaction.
      *
