@@ -46,6 +46,7 @@ wallet.dispose()
 - **Multi-Account Management**: Derive multiple accounts from a single seed phrase
 - **Native TRX Transactions**: Quote and send TRX transfers through a unified wallet API
 - **TRC20 Support**: Query balances and transfer TRC20 tokens
+- **Arbitrary Transactions**: Send smart contract calls (by contract address and function selector) or any pre-built TronWeb transaction (e.g. staking, voting), with automatic fee quoting
 - **Message Signing**: Sign messages and verify signatures with TRON accounts
 - **Fee Estimation**: Retrieve current network fee rates and quote transaction costs
 - **Read-Only Accounts**: Monitor any TRON address without a private key
