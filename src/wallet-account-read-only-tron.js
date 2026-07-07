@@ -160,12 +160,10 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    * @param {TronTransaction} tx - The transaction.
    * @returns {Promise<Omit<TransactionResult, 'hash'> & TronActivationFee>} The transaction's quotes.
    */
-  async quoteSendTransaction (tx) {
+  async quoteSendTransaction ({ to, value }) {
     if (!this._tronWeb) {
       throw new Error('The wallet must be connected to tron web to quote transactions.')
     }
-
-    const { to, value } = tx
 
     const address = await this.getAddress()
 
