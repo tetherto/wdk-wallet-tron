@@ -214,7 +214,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
       throw new Error('The wallet must be connected to tron web to send transactions.')
     }
 
-    const isSigned = Boolean(tx.txID)
+    const isSigned = !!tx.txID
 
     let transaction, quote
 
