@@ -38,7 +38,7 @@ import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js'
 /** @typedef {import('./wallet-account-read-only-tron.js').TronWalletConfig} TronWalletConfig */
 /** @typedef {import('./wallet-account-read-only-tron.js').TronActivationFee} TronActivationFee */
 
-/** @typedef {import('tronweb').Types.SignedTransaction} SignedTransaction */
+/** @typedef {import('tronweb').Types.SignedTransaction} TronSignedTransaction */
 
 const BIP_44_TRON_DERIVATION_PATH_PREFIX = "m/44'/195'"
 const DEFAULT_FEE_LIMIT_SUN = 15_000_000
@@ -57,7 +57,7 @@ function getTronAddress (publicKey) {
   return address
 }
 
-/** @implements {IWalletAccount<SignedTransaction>} */
+/** @implements {IWalletAccount<TronSignedTransaction>} */
 export default class WalletAccountTron extends WalletAccountReadOnlyTron {
   /**
    * Creates a new tron wallet account.
@@ -160,7 +160,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    * Signs a transaction.
    *
    * @param {TronTransaction} tx - The transaction to sign.
-   * @returns {Promise<SignedTransaction>} The signed transaction.
+   * @returns {Promise<TronSignedTransaction>} The signed transaction.
    * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
    */
   async signTransaction ({ to, value }) {
@@ -185,7 +185,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
   /**
    * Quotes the costs of a send transaction operation.
    *
-   * @param {TronTransaction | SignedTransaction} tx - The transaction, or a signed transaction.
+   * @param {TronTransaction | TronSignedTransaction} tx - The transaction, or a signed transaction.
    * @returns {Promise<Omit<TransactionResult, 'hash'> & TronActivationFee>} The transaction's quotes.
    */
   async quoteSendTransaction (tx) {
@@ -205,7 +205,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
   /**
    * Sends a transaction.
    *
-   * @param {TronTransaction | SignedTransaction} tx - The transaction, or a signed transaction.
+   * @param {TronTransaction | TronSignedTransaction} tx - The transaction, or a signed transaction.
    * @returns {Promise<TransactionResult & TronActivationFee>} The transaction's result.
    * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
    */
