@@ -248,14 +248,7 @@ describe('WalletAccountTron', () => {
   describe('quoteSendTransaction', () => {
     test('should quote an already-signed transaction without broadcasting', async () => {
       const RECIPIENT = 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD'
-      const SIGNED_TX = {
-        txID: '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f',
-        raw_data_hex: '0a' + '00'.repeat(100),
-        raw_data: {
-          contract: [{ parameter: { value: { to_address: TronWeb.address.toHex(RECIPIENT) } } }]
-        },
-        signature: ['deadbeef']
-      }
+      const SIGNED_TX = { ...transferTx(RECIPIENT), signature: ['deadbeef'] }
 
       getAccountMock.mockResolvedValue({ address: RECIPIENT })
 
@@ -269,7 +262,7 @@ describe('WalletAccountTron', () => {
       const { fee, activationFee } = await account.quoteSendTransaction(SIGNED_TX)
 
       expect(sendTrxMock).not.toHaveBeenCalled()
-      expect(getAccountMock).toHaveBeenCalledWith(RECIPIENT)
+      expect(getAccountMock).toHaveBeenCalledWith(TronWeb.address.toHex(RECIPIENT))
 
       expect(fee).toBe(245_000n)
       expect(activationFee).toBe(0n)

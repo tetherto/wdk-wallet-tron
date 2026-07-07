@@ -60,7 +60,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron impleme
      * @returns {Promise<TronSignedTransaction>} The signed transaction.
      * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
      */
-    signTransaction({ to, value }: TronTransaction): Promise<TronSignedTransaction>;
+    signTransaction(tx: TronTransaction): Promise<TronSignedTransaction>;
     /**
      * Quotes the costs of a send transaction operation.
      *

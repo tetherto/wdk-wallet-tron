@@ -40,19 +40,6 @@ import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js'
 
 /** @typedef {import('tronweb').Types.SignedTransaction} TronSignedTransaction */
 /** @typedef {import('tronweb').Types.Transaction} Transaction */
-    }
-
-    const address = await this.getAddress()
-    const isSigned = Boolean(tx.txID)
-@Davi0kProgramsThings
-Davi0kProgramsThings
-3 hours ago
-Member
-Better javascript idiom:
-
-Suggested change
-    const isSigned = Boolean(tx.txID)
-    const isSigned = !!tx.txID
 
 const BIP_44_TRON_DERIVATION_PATH_PREFIX = "m/44'/195'"
 const DEFAULT_FEE_LIMIT_SUN = 15_000_000
@@ -203,16 +190,6 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    * @returns {Promise<Omit<TransactionResult, 'hash'> & TronActivationFee>} The transaction's quotes.
    */
   async quoteSendTransaction (tx) {
-    if (tx.txID) {
-      if (!this._tronWeb) {
-        throw new Error('The wallet must be connected to tron web to quote transactions.')
-      }
-
-      const to = this._tronWeb.address.fromHex(tx.raw_data.contract[0].parameter.value.to_address)
-
-      return await this._getSendTrxFee(to, tx)
-    }
-
     return await super.quoteSendTransaction(tx)
   }
 
@@ -228,27 +205,21 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
       throw new Error('The wallet must be connected to tron web to send transactions.')
     }
 
-    const isSigned = !!tx.txID
-    
-    let transaction, quote
-    
-    if (isSigned) {
-      quote = await this.quoteSendTransaction(tx)
-    } else {
-      transaction = await this._buildTransaction(tx)
-      
+    let signedTransaction = tx
+
+    if (!tx.signature) {
+      const transaction = await this._buildTransaction(tx)
+
       await this._assertTransactionOwner(transaction)
-      
-      quote = await this._quoteTransaction(transaction)
+
+      signedTransaction = await this._signTransaction(transaction)
     }
-    
-    const { fee, activationFee } = quote
+
+    const { fee, activationFee } = await this.quoteSendTransaction(signedTransaction)
 
     if (this._config.transactionMaxFee !== undefined && BigInt(fee) > BigInt(this._config.transactionMaxFee)) {
       throw new Error('Exceeded maximum fee cost for transaction operation.')
     }
-
-    const signedTransaction = isSigned ? tx : await this._signTransaction(transaction)
 
     const { txid } = await this._tronWeb.trx.sendRawTransaction(signedTransaction)
 
