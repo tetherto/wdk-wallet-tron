@@ -231,7 +231,7 @@ describe('WalletAccountTron', () => {
   })
 
   describe('quoteSendTransaction', () => {
-    test('should quote an already-signed transaction without rebuilding it', async () => {
+    test('should quote an already-signed transaction without broadcasting', async () => {
       const RECIPIENT = 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD'
       const SIGNED_TX = {
         txID: '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f',
@@ -302,7 +302,7 @@ describe('WalletAccountTron', () => {
       expect(getAccountResourcesMock).toHaveBeenCalledWith(ACCOUNT.address)
     })
 
-    test('should broadcast an already-signed transaction without rebuilding it', async () => {
+    test('should broadcast an already-signed transaction', async () => {
       const RECIPIENT = 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD'
       const DUMMY_TX_ID = 'abc123def456'
       const SIGNED_TX = {
