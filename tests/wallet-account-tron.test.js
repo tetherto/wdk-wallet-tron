@@ -245,6 +245,30 @@ describe('WalletAccountTron', () => {
     })
   })
 
+  describe('quoteSendTransaction', () => {
+    test('should quote an already-signed transaction without broadcasting', async () => {
+      const RECIPIENT = 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD'
+      const SIGNED_TX = { ...transferTx(RECIPIENT), signature: ['deadbeef'] }
+
+      getAccountMock.mockResolvedValue({ address: RECIPIENT })
+
+      getAccountResourcesMock.mockResolvedValue({
+        freeNetLimit: 5000,
+        freeNetUsed: 4900,
+        NetLimit: 0,
+        NetUsed: 0
+      })
+
+      const { fee, activationFee } = await account.quoteSendTransaction(SIGNED_TX)
+
+      expect(sendTrxMock).not.toHaveBeenCalled()
+      expect(getAccountMock).toHaveBeenCalledWith(TronWeb.address.toHex(RECIPIENT))
+
+      expect(fee).toBe(245_000n)
+      expect(activationFee).toBe(0n)
+    })
+  })
+
   describe('sendTransaction', () => {
     test('should successfully send a tronix transfer', async () => {
       const TRANSACTION = { to: RECIPIENT, value: 1_000_000 }
@@ -381,6 +405,39 @@ describe('WalletAccountTron', () => {
       await expect(account.sendTransaction(PREBUILT))
         .rejects.toThrow('The transaction owner does not match the wallet account address.')
       expect(sendRawTransactionMock).not.toHaveBeenCalled()
+    })
+
+    test('should broadcast an already-signed transaction', async () => {
+      const RECIPIENT = 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD'
+      const DUMMY_TX_ID = 'abc123def456'
+      const SIGNED_TX = {
+        txID: '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f',
+        raw_data_hex: '0a' + '00'.repeat(100),
+        raw_data: {
+          contract: [{ parameter: { value: { to_address: TronWeb.address.toHex(RECIPIENT) } } }]
+        },
+        signature: ['deadbeef']
+      }
+
+      sendRawTransactionMock.mockResolvedValue({ txid: DUMMY_TX_ID })
+
+      getAccountMock.mockResolvedValue({ address: RECIPIENT })
+
+      getAccountResourcesMock.mockResolvedValue({
+        freeNetLimit: 5000,
+        freeNetUsed: 0,
+        NetLimit: 0,
+        NetUsed: 0
+      })
+
+      const { hash, fee, activationFee } = await account.sendTransaction(SIGNED_TX)
+
+      expect(hash).toBe(DUMMY_TX_ID)
+      expect(fee).toBe(0n)
+      expect(activationFee).toBe(0n)
+
+      expect(sendRawTransactionMock).toHaveBeenCalledWith(SIGNED_TX)
+      expect(sendTrxMock).not.toHaveBeenCalled()
     })
 
     test('should throw if transaction fee exceeds the transaction max fee configuration', async () => {

@@ -1,5 +1,5 @@
 /** @implements {IWalletAccount} */
-export default class WalletAccountTron extends WalletAccountReadOnlyTron implements IWalletAccount {
+export default class WalletAccountTron extends WalletAccountReadOnlyTron implements IWalletAccount<TronSignedTransaction> {
     /**
      * Creates a new tron wallet account.
      *
@@ -57,18 +57,25 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron impleme
      * Signs a transaction.
      *
      * @param {TronTransaction} tx - The transaction to sign.
-     * @returns {Promise<SignedTransaction>} The signed transaction.
+     * @returns {Promise<TronSignedTransaction>} The signed transaction.
      * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
      */
-    signTransaction(tx: TronTransaction): Promise<SignedTransaction>;
+    signTransaction(tx: TronTransaction): Promise<TronSignedTransaction>;
+    /**
+     * Quotes the costs of a send transaction operation.
+     *
+     * @param {TronTransaction | TronSignedTransaction} tx - The transaction, or a signed transaction.
+     * @returns {Promise<Omit<TransactionResult, 'hash'> & TronActivationFee>} The transaction's quotes.
+     */
+    quoteSendTransaction(tx: TronTransaction | TronSignedTransaction): Promise<Omit<TransactionResult, "hash"> & TronActivationFee>;
     /**
      * Sends a transaction.
      *
-     * @param {TronTransaction} tx - The transaction.
+     * @param {TronTransaction | TronSignedTransaction} tx - The transaction, or a signed transaction.
      * @returns {Promise<TransactionResult & TronActivationFee>} The transaction's result.
      * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
      */
-    sendTransaction(tx: TronTransaction): Promise<TransactionResult & TronActivationFee>;
+    sendTransaction(tx: TronTransaction | TronSignedTransaction): Promise<TransactionResult & TronActivationFee>;
     /**
      * Asserts that a built transaction is owned by this wallet account, to avoid
      * signing a transaction that operates on a different account.
@@ -100,7 +107,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron impleme
     /** @private */
     private _signTransaction;
 }
-export type IWalletAccount = import("@tetherto/wdk-wallet").IWalletAccount;
+export type IWalletAccount<TSignedTransaction> = import("@tetherto/wdk-wallet").IWalletAccount<TSignedTransaction>;
 export type KeyPair = import("@tetherto/wdk-wallet").KeyPair;
 export type TransactionResult = import("@tetherto/wdk-wallet").TransactionResult;
 export type TransferOptions = import("@tetherto/wdk-wallet").TransferOptions;
@@ -108,7 +115,7 @@ export type TransferResult = import("@tetherto/wdk-wallet").TransferResult;
 export type TronTransaction = import("./wallet-account-read-only-tron.js").TronTransaction;
 export type TronWalletConfig = import("./wallet-account-read-only-tron.js").TronWalletConfig;
 export type TronActivationFee = import("./wallet-account-read-only-tron.js").TronActivationFee;
-export type SignedTransaction = import("tronweb").Types.SignedTransaction;
+export type TronSignedTransaction = import("tronweb").Types.SignedTransaction;
 export type Transaction = import("tronweb").Types.Transaction;
 import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js';
 import { HDKey } from '@scure/bip32';

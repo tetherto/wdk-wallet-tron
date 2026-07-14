@@ -38,7 +38,7 @@ import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js'
 /** @typedef {import('./wallet-account-read-only-tron.js').TronWalletConfig} TronWalletConfig */
 /** @typedef {import('./wallet-account-read-only-tron.js').TronActivationFee} TronActivationFee */
 
-/** @typedef {import('tronweb').Types.SignedTransaction} SignedTransaction */
+/** @typedef {import('tronweb').Types.SignedTransaction} TronSignedTransaction */
 /** @typedef {import('tronweb').Types.Transaction} Transaction */
 
 const BIP_44_TRON_DERIVATION_PATH_PREFIX = "m/44'/195'"
@@ -58,7 +58,7 @@ function getTronAddress (publicKey) {
   return address
 }
 
-/** @implements {IWalletAccount} */
+/** @implements {IWalletAccount<TronSignedTransaction>} */
 export default class WalletAccountTron extends WalletAccountReadOnlyTron {
   /**
    * Creates a new tron wallet account.
@@ -161,7 +161,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    * Signs a transaction.
    *
    * @param {TronTransaction} tx - The transaction to sign.
-   * @returns {Promise<SignedTransaction>} The signed transaction.
+   * @returns {Promise<TronSignedTransaction>} The signed transaction.
    * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
    */
   async signTransaction (tx) {
@@ -184,9 +184,19 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
   }
 
   /**
+   * Quotes the costs of a send transaction operation.
+   *
+   * @param {TronTransaction | TronSignedTransaction} tx - The transaction, or a signed transaction.
+   * @returns {Promise<Omit<TransactionResult, 'hash'> & TronActivationFee>} The transaction's quotes.
+   */
+  async quoteSendTransaction (tx) {
+    return await super.quoteSendTransaction(tx)
+  }
+
+  /**
    * Sends a transaction.
    *
-   * @param {TronTransaction} tx - The transaction.
+   * @param {TronTransaction | TronSignedTransaction} tx - The transaction, or a signed transaction.
    * @returns {Promise<TransactionResult & TronActivationFee>} The transaction's result.
    * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
    */
@@ -195,17 +205,21 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
       throw new Error('The wallet must be connected to tron web to send transactions.')
     }
 
-    const transaction = await this._buildTransaction(tx)
+    let signedTransaction = tx
 
-    await this._assertTransactionOwner(transaction)
+    if (!tx.signature) {
+      const transaction = await this._buildTransaction(tx)
 
-    const { fee, activationFee } = await this._quoteTransaction(transaction)
+      await this._assertTransactionOwner(transaction)
+
+      signedTransaction = await this._signTransaction(transaction)
+    }
+
+    const { fee, activationFee } = await this.quoteSendTransaction(signedTransaction)
 
     if (this._config.transactionMaxFee !== undefined && BigInt(fee) > BigInt(this._config.transactionMaxFee)) {
       throw new Error('Exceeded maximum fee cost for transaction operation.')
     }
-
-    const signedTransaction = await this._signTransaction(transaction)
 
     const { txid } = await this._tronWeb.trx.sendRawTransaction(signedTransaction)
 

@@ -16,3 +16,4 @@ export type TriggerSmartContractOptions = import("./src/wallet-account-read-only
 export type EstimateEnergyCostValue = import("./src/wallet-account-read-only-tron.js").EstimateEnergyCostValue;
 export type TronWalletConfig = import("./src/wallet-account-read-only-tron.js").TronWalletConfig;
 export type TronActivationFee = import("./src/wallet-account-read-only-tron.js").TronActivationFee;
+export type TronSignedTransaction = import("./src/wallet-account-tron.js").TronSignedTransaction;
