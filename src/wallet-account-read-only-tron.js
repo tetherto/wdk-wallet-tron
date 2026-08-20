@@ -222,6 +222,30 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
   }
 
   /**
+   * Returns the remaining amount of a TRC-20 token that a spender is allowed to spend
+   * on behalf of the account.
+   *
+   * @param {string} tokenAddress - The smart contract address of the token.
+   * @param {string} spender - The spender's address.
+   * @returns {Promise<bigint>} The allowance (in base unit).
+   */
+  async getAllowance (tokenAddress, spender) {
+    if (!this._tronWeb) {
+      throw new Error('The wallet must be connected to tron web to retrieve allowances.')
+    }
+
+    const address = await this.getAddress()
+    const addressHex = this._tronWeb.address.toHex(address)
+    const spenderHex = this._tronWeb.address.toHex(spender)
+    const parameters = [{ type: 'address', value: addressHex }, { type: 'address', value: spenderHex }]
+
+    const result = await this._tronWeb.transactionBuilder
+      .triggerConstantContract(tokenAddress, 'allowance(address,address)', {}, parameters, addressHex)
+
+    return BigInt('0x' + result.constant_result[0])
+  }
+
+  /**
    * Quotes the costs of a send transaction operation.
    *
    * @param {TronTransaction} tx - The transaction.

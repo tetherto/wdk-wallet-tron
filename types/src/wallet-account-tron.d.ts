@@ -90,6 +90,14 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron impleme
      */
     transfer(options: TransferOptions): Promise<TransferResult>;
     /**
+     * Approves a specific amount of a TRC-20 token to a spender.
+     *
+     * @param {ApproveOptions} options - The approve options.
+     * @returns {Promise<TransactionResult & TronActivationFee>} The transaction's result.
+     * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
+     */
+    approve(options: ApproveOptions): Promise<TransactionResult & TronActivationFee>;
+    /**
      * Returns a read-only copy of the account.
      *
      * @returns {Promise<WalletAccountReadOnlyTron>} The read-only account.
@@ -112,5 +120,19 @@ export type TronWalletConfig = import("./wallet-account-read-only-tron.js").Tron
 export type TronActivationFee = import("./wallet-account-read-only-tron.js").TronActivationFee;
 export type TronSignedTransaction = import("tronweb").Types.SignedTransaction;
 export type Transaction = import("tronweb").Types.Transaction;
+export type ApproveOptions = {
+    /**
+     * - The address of the token to approve.
+     */
+    token: string;
+    /**
+     * - The spender's address.
+     */
+    spender: string;
+    /**
+     * - The amount of tokens to approve to the spender.
+     */
+    amount: number | bigint;
+};
 import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js';
 import { HDKey } from '@scure/bip32';

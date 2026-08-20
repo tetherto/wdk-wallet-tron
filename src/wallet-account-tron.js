@@ -41,6 +41,13 @@ import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js'
 /** @typedef {import('tronweb').Types.SignedTransaction} TronSignedTransaction */
 /** @typedef {import('tronweb').Types.Transaction} Transaction */
 
+/**
+ * @typedef {Object} ApproveOptions
+ * @property {string} token - The address of the token to approve.
+ * @property {string} spender - The spender's address.
+ * @property {number | bigint} amount - The amount of tokens to approve to the spender.
+ */
+
 const BIP_44_TRON_DERIVATION_PATH_PREFIX = "m/44'/195'"
 const DEFAULT_FEE_LIMIT_SUN = 15_000_000
 
@@ -295,6 +302,30 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
     const { txid } = await this._tronWeb.trx.sendRawTransaction(signedTransaction)
 
     return { hash: txid, fee }
+  }
+
+  /**
+   * Approves a specific amount of a TRC-20 token to a spender.
+   *
+   * @param {ApproveOptions} options - The approve options.
+   * @returns {Promise<TransactionResult & TronActivationFee>} The transaction's result.
+   * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
+   */
+  async approve (options) {
+    if (!this._tronWeb) {
+      throw new Error('The wallet must be connected to tron web to approve funds.')
+    }
+
+    const { token, spender, amount } = options
+
+    return await this.sendTransaction({
+      contractAddress: token,
+      functionSelector: 'approve(address,uint256)',
+      parameters: [
+        { type: 'address', value: this._tronWeb.address.toHex(spender) },
+        { type: 'uint256', value: BigInt(amount).toString() }
+      ]
+    })
   }
 
   /**

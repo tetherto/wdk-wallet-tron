@@ -142,6 +142,40 @@ describe('WalletAccountReadOnlyTron', () => {
     })
   })
 
+  describe('getAllowance', () => {
+    const TOKEN_ADDRESS = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'
+    const SPENDER = 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD'
+
+    test('should return the correct allowance of the spender', async () => {
+      const DUMMY_CONSTANT_RESULT = {
+        constant_result: ['00000000000000000000000000000000000000000000000000000000000f4240']
+      }
+
+      triggerConstantContractMock.mockResolvedValue(DUMMY_CONSTANT_RESULT)
+
+      const allowance = await account.getAllowance(TOKEN_ADDRESS, SPENDER)
+
+      expect(triggerConstantContractMock).toHaveBeenCalledWith(
+        TOKEN_ADDRESS,
+        'allowance(address,address)',
+        {},
+        [
+          { type: 'address', value: TronWeb.address.toHex(ADDRESS) },
+          { type: 'address', value: TronWeb.address.toHex(SPENDER) }
+        ],
+        TronWeb.address.toHex(ADDRESS)
+      )
+
+      expect(allowance).toBe(1_000_000n)
+    })
+
+    test('should throw if the account is not connected to tron web', async () => {
+      const disconnectedAccount = new WalletAccountReadOnlyTron(ADDRESS)
+      await expect(disconnectedAccount.getAllowance(TOKEN_ADDRESS, SPENDER))
+        .rejects.toThrow('The wallet must be connected to tron web to retrieve allowances.')
+    })
+  })
+
   describe('quoteSendTransaction', () => {
     const RECIPIENT = 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD'
 

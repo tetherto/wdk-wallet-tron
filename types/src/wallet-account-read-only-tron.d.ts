@@ -59,6 +59,15 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      */
     getTokenBalance(tokenAddress: string): Promise<bigint>;
     /**
+     * Returns the remaining amount of a TRC-20 token that a spender is allowed to spend
+     * on behalf of the account.
+     *
+     * @param {string} tokenAddress - The smart contract address of the token.
+     * @param {string} spender - The spender's address.
+     * @returns {Promise<bigint>} The allowance (in base unit).
+     */
+    getAllowance(tokenAddress: string, spender: string): Promise<bigint>;
+    /**
      * Quotes the costs of a send transaction operation.
      *
      * @param {TronTransaction} tx - The transaction.
