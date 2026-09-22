@@ -55,6 +55,14 @@ export default class WalletManagerTron extends WalletManager {
      */
     getAccountByPath(path: string): Promise<WalletAccountTron>;
     /**
+     * Builds the account config, injecting the manager's shared tron web client so accounts
+     * reuse it instead of opening their own.
+     *
+     * @private
+     * @returns {TronWalletConfig} The account configuration.
+     */
+    private _accountConfig;
+    /**
      * Returns the current fee rates.
      *
      * @returns {Promise<FeeRates>} The fee rates.

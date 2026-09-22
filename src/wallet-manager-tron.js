@@ -89,12 +89,23 @@ export default class WalletManagerTron extends WalletManager {
    */
   async getAccountByPath (path) {
     if (!this._accounts[path]) {
-      const account = new WalletAccountTron(this.seed, path, this._config)
+      const account = new WalletAccountTron(this.seed, path, this._accountConfig())
 
       this._accounts[path] = account
     }
 
     return this._accounts[path]
+  }
+
+  /**
+   * Builds the account config, injecting the manager's shared tron web client so accounts
+   * reuse it instead of opening their own.
+   *
+   * @private
+   * @returns {TronWalletConfig} The account configuration.
+   */
+  _accountConfig () {
+    return { ...this._config, provider: this._tronWeb }
   }
 
   /**

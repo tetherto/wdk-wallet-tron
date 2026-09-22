@@ -336,7 +336,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
   async toReadOnlyAccount () {
     if (!this._tronReadOnlyAccount) {
       const address = await this.getAddress()
-      this._tronReadOnlyAccount = new WalletAccountReadOnlyTron(address, this._config)
+      this._tronReadOnlyAccount = new WalletAccountReadOnlyTron(address, { ...this._config, provider: this._tronWeb })
     }
 
     return this._tronReadOnlyAccount
