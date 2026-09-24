@@ -16,7 +16,7 @@ export default class WalletManagerTron extends WalletManager {
     /**
      * Creates a new wallet manager for the tron blockchain.
      *
-     * @param {string | Uint8Array} seed - The wallet's BIP-39 seed phrase.
+     * @param {string | Uint8Array} seed - A BIP-39 mnemonic seed phrase, or a raw BIP-32 master seed (16-64 bytes).
      * @param {TronWalletConfig} [config] - The configuration object.
      */
     constructor(seed: string | Uint8Array, config?: TronWalletConfig);
