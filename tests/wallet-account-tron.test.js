@@ -3,6 +3,8 @@ import * as bip39 from 'bip39'
 
 import { TronWeb, Trx } from 'tronweb'
 
+import { DisposalError } from '@tetherto/wdk-wallet'
+
 const SEED_PHRASE = 'cook voyage document eight skate token alien guide drink uncle term abuse'
 const INVALID_SEED_PHRASE = 'invalid seed phrase'
 const SEED = bip39.mnemonicToSeedSync(SEED_PHRASE)
@@ -102,6 +104,30 @@ describe('WalletAccountTron', () => {
     test('should throw if the path is invalid', () => {
       expect(() => { new WalletAccountTron(SEED_PHRASE, "a'/b/c") })
         .toThrow('invalid child index')
+    })
+  })
+
+  describe('dispose', () => {
+    test('should expose the disposed state', () => {
+      const account = new WalletAccountTron(SEED_PHRASE, "0'/0/0")
+
+      expect(account.disposed).toBe(false)
+
+      account.dispose()
+
+      expect(account.disposed).toBe(true)
+    })
+
+    test('should throw DisposalError from signing methods once disposed', async () => {
+      const account = new WalletAccountTron(SEED_PHRASE, "0'/0/0")
+
+      account.dispose()
+
+      await expect(account.sign('message')).rejects.toThrow(DisposalError)
+      await expect(account.signTransaction({})).rejects.toThrow(DisposalError)
+      await expect(account.sendTransaction({})).rejects.toThrow(DisposalError)
+      await expect(account.transfer({ token: 'T', recipient: 'T', amount: 1 })).rejects.toThrow(DisposalError)
+      await expect(account.approve({ token: 'T', spender: 'T', amount: 1 })).rejects.toThrow(DisposalError)
     })
   })
 

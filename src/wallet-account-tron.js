@@ -25,6 +25,8 @@ import * as bip39 from 'bip39'
 // eslint-disable-next-line camelcase
 import { sodium_memzero } from 'sodium-universal'
 
+import { DisposalError } from '@tetherto/wdk-wallet'
+
 import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js'
 
 /** @typedef {import('@tetherto/wdk-wallet').IWalletAccount} IWalletAccount */
@@ -109,6 +111,18 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
      * @type {HDKey}
      */
     this._account = account
+
+    /** @private */
+    this._disposed = false
+  }
+
+  /**
+   * True if the account has been disposed.
+   *
+   * @type {boolean}
+   */
+  get disposed () {
+    return this._disposed
   }
 
   /**
@@ -150,8 +164,13 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    *
    * @param {string} message - The message to sign.
    * @returns {Promise<string>} The message's signature.
+   * @throws {DisposalError} If the account has been disposed.
    */
   async sign (message) {
+    if (this.disposed) {
+      throw new DisposalError('The account has been disposed.')
+    }
+
     const messageBytes = Buffer.from(message, 'utf8')
     const prefix = Buffer.from(`\x19TRON Signed Message:\n${messageBytes.length}`, 'utf8')
     const messageWithPrefixBytes = Buffer.concat([prefix, messageBytes])
@@ -170,8 +189,13 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    * @param {TronTransaction} tx - The transaction to sign.
    * @returns {Promise<TronSignedTransaction>} The signed transaction.
    * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
+   * @throws {DisposalError} If the account has been disposed.
    */
   async signTransaction (tx) {
+    if (this.disposed) {
+      throw new DisposalError('The account has been disposed.')
+    }
+
     if (!this._tronWeb) {
       throw new Error('The wallet must be connected to tron web to sign transactions.')
     }
@@ -208,8 +232,13 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    * @param {TronTransaction | TronSignedTransaction} tx - The transaction, or a signed transaction.
    * @returns {Promise<TransactionResult & TronActivationFee>} The transaction's result.
    * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
+   * @throws {DisposalError} If the account has been disposed.
    */
   async sendTransaction (tx) {
+    if (this.disposed) {
+      throw new DisposalError('The account has been disposed.')
+    }
+
     if (!this._tronWeb) {
       throw new Error('The wallet must be connected to tron web to send transactions.')
     }
@@ -269,8 +298,13 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    * @param {TransferOptions} options - The transfer's options.
    * @returns {Promise<TransferResult>} The transfer's result.
    * @throws {Error} If the transfer's cost exceeds the maximum transfer fee option.
+   * @throws {DisposalError} If the account has been disposed.
    */
   async transfer ({ token, recipient, amount }) {
+    if (this.disposed) {
+      throw new DisposalError('The account has been disposed.')
+    }
+
     if (!this._tronWeb) {
       throw new Error('The wallet must be connected to tron web to transfer tokens.')
     }
@@ -310,8 +344,13 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    * @param {ApproveOptions} options - The approve options.
    * @returns {Promise<TransactionResult & TronActivationFee>} The transaction's result.
    * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
+   * @throws {DisposalError} If the account has been disposed.
    */
   async approve (options) {
+    if (this.disposed) {
+      throw new DisposalError('The account has been disposed.')
+    }
+
     if (!this._tronWeb) {
       throw new Error('The wallet must be connected to tron web to approve funds.')
     }
@@ -346,11 +385,15 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    * Disposes the wallet account, erasing the private key from the memory.
    */
   dispose () {
+    if (this._disposed) return
+
     sodium_memzero(this._account.privKeyBytes)
 
     this._account.privKeyBytes = undefined
 
     this._account.privKey = undefined
+
+    this._disposed = true
   }
 
   /** @private */
