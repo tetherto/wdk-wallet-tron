@@ -40,10 +40,21 @@ console.log('Address:', address)
 wallet.dispose()
 ```
 
+The manager also accepts a signer in place of the seed phrase:
+
+```javascript
+import { SeedSignerTron } from '@tetherto/wdk-wallet-tron/signers'
+
+const wallet = new WalletManagerTron(new SeedSignerTron(seedPhrase), {
+  provider: 'https://api.shasta.trongrid.io'
+})
+```
+
 ## Key Capabilities
 
 - **BIP-44 Derivation Paths**: Standard TRON derivation support (`m/44'/195'`)
 - **Multi-Account Management**: Derive multiple accounts from a single seed phrase
+- **Multiple Signers**: Plug in seed or private-key signers via `@tetherto/wdk-wallet-tron/signers`, and register extra signers by name with `addSigner`
 - **Native TRX Transactions**: Quote and send TRX transfers through a unified wallet API
 - **TRC20 Support**: Query balances and transfer TRC20 tokens
 - **Arbitrary Transactions**: Send smart contract calls (by contract address and function selector) or any pre-built TronWeb transaction (e.g. staking, voting), with automatic fee quoting

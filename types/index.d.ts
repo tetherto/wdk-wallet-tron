@@ -22,3 +22,5 @@ export type EstimateEnergyCostValue = import("./src/wallet-account-read-only-tro
 export type TronWalletConfig = import("./src/wallet-account-read-only-tron.js").TronWalletConfig;
 export type TronActivationFee = import("./src/wallet-account-read-only-tron.js").TronActivationFee;
 export type TronSignedTransaction = import("./src/wallet-account-tron.js").TronSignedTransaction;
+export type SignerOptions = import("./src/wallet-account-tron.js").SignerOptions;
+export { DisposalError, InvalidSignerError, NoSuchElementError, UnsupportedOperationError, ValueError, ISigner } from "@tetherto/wdk-wallet";

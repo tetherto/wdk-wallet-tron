@@ -8,7 +8,6 @@ const INVALID_SEED_PHRASE = 'invalid seed phrase'
 const SEED = bip39.mnemonicToSeedSync(SEED_PHRASE)
 
 const ACCOUNT = {
-  index: 0,
   path: "m/44'/195'/0'/0/0",
   address: 'TXngH8bVadn9ZWtKBgjKQcqN1GsZ7A1jcb',
   keyPair: {
@@ -57,7 +56,8 @@ jest.unstable_mockModule('tronweb', () => {
   }
 })
 
-const { WalletAccountTron, WalletAccountReadOnlyTron } = await import('../index.js')
+const { WalletAccountTron, WalletAccountReadOnlyTron, DisposalError, ValueError } = await import('../index.js')
+const { SeedSignerTron } = await import('../src/signers/index.js')
 
 describe('WalletAccountTron', () => {
   let account
@@ -75,7 +75,6 @@ describe('WalletAccountTron', () => {
 
   describe('constructor', () => {
     test('should successfully initialize an account for the given seed phrase and path', () => {
-      expect(account.index).toBe(ACCOUNT.index)
       expect(account.path).toBe(ACCOUNT.path)
       expect(account.keyPair).toEqual({
         privateKey: new Uint8Array(Buffer.from(ACCOUNT.keyPair.privateKey, 'hex')),
@@ -86,7 +85,6 @@ describe('WalletAccountTron', () => {
     test('should successfully initialize an account for the given seed and path', () => {
       const account = new WalletAccountTron(SEED, "0'/0/0", { provider: 'https://tron.web.provider/' })
 
-      expect(account.index).toBe(ACCOUNT.index)
       expect(account.path).toBe(ACCOUNT.path)
       expect(account.keyPair).toEqual({
         privateKey: new Uint8Array(Buffer.from(ACCOUNT.keyPair.privateKey, 'hex')),
@@ -101,7 +99,159 @@ describe('WalletAccountTron', () => {
 
     test('should throw if the path is invalid', () => {
       expect(() => { new WalletAccountTron(SEED_PHRASE, "a'/b/c") })
-        .toThrow('invalid child index')
+        .toThrow(ValueError)
+      expect(() => { new WalletAccountTron(SEED_PHRASE, "a'/b/c") })
+        .toThrow('The derivation path "44\'/195\'/a\'/b/c" has an invalid child index: "a\'".')
+    })
+
+    test('should default to the first account if only a seed and a config are given', async () => {
+      const account = new WalletAccountTron(SEED_PHRASE, { provider: 'https://tron.web.provider/' })
+
+      expect(account.path).toBe(ACCOUNT.path)
+      expect(await account.getAddress()).toBe(ACCOUNT.address)
+      expect(account._config).toEqual({ provider: 'https://tron.web.provider/' })
+    })
+
+    test('should keep the config if the path is undefined', async () => {
+      const config = { provider: 'https://tron.web.provider/', transactionMaxFee: 1 }
+      const account = new WalletAccountTron(SEED_PHRASE, undefined, config)
+
+      expect(account.path).toBe(ACCOUNT.path)
+      expect(account._config).toBe(config)
+    })
+
+    test('should default to the first account if only a seed is given', async () => {
+      const account = new WalletAccountTron(SEED)
+
+      expect(account.path).toBe(ACCOUNT.path)
+      expect(await account.getAddress()).toBe(ACCOUNT.address)
+    })
+
+    describe('signer', () => {
+      test('should successfully initialize an account for the given signer', async () => {
+        const signer = new SeedSignerTron(SEED_PHRASE, ACCOUNT.path)
+        const account = new WalletAccountTron(signer, { provider: 'https://tron.web.provider/' })
+
+        expect(account.path).toBe(ACCOUNT.path)
+        expect(await account.getAddress()).toBe(ACCOUNT.address)
+        expect(account.keyPair).toEqual(signer.keyPair)
+      })
+
+      test('should throw if a path is given along with the signer', () => {
+        const signer = new SeedSignerTron(SEED_PHRASE, ACCOUNT.path)
+
+        expect(() => new WalletAccountTron(signer, "0'/0/0", { provider: 'https://tron.web.provider/' }))
+          .toThrow(ValueError)
+        expect(() => new WalletAccountTron(signer, "0'/0/0", { provider: 'https://tron.web.provider/' }))
+          .toThrow('A derivation path cannot be given with a signer; derive the signer instead (e.g. signer.derive(path)).')
+      })
+
+      test('should initialize without a config', async () => {
+        const account = new WalletAccountTron(new SeedSignerTron(SEED_PHRASE, ACCOUNT.path))
+
+        expect(await account.getAddress()).toBe(ACCOUNT.address)
+      })
+    })
+  })
+
+  describe('fromPrivateKey', () => {
+    test('should create an account from a hex private key', async () => {
+      const account = WalletAccountTron.fromPrivateKey(ACCOUNT.keyPair.privateKey, { provider: 'https://tron.web.provider/' })
+
+      expect(account.path).toBeNull()
+      expect(await account.getAddress()).toBe(ACCOUNT.address)
+      expect(account.keyPair).toEqual({
+        privateKey: new Uint8Array(Buffer.from(ACCOUNT.keyPair.privateKey, 'hex')),
+        publicKey: new Uint8Array(Buffer.from(ACCOUNT.keyPair.publicKey, 'hex'))
+      })
+    })
+
+    test('should produce the same signature as the seed account', async () => {
+      const privateKeyAccount = WalletAccountTron.fromPrivateKey('0x' + ACCOUNT.keyPair.privateKey)
+
+      expect(await privateKeyAccount.sign('Dummy message to sign.')).toBe(await account.sign('Dummy message to sign.'))
+    })
+
+    test('should wipe the signer it created on dispose', () => {
+      const account = WalletAccountTron.fromPrivateKey(ACCOUNT.keyPair.privateKey)
+
+      account.dispose()
+
+      expect(account.keyPair.privateKey).toBeNull()
+    })
+  })
+
+  describe('disposed', () => {
+    test('should be false after construction and true after dispose', () => {
+      const account = new WalletAccountTron(SEED_PHRASE, "0'/0/0")
+
+      expect(account.disposed).toBe(false)
+
+      account.dispose()
+
+      expect(account.disposed).toBe(true)
+    })
+
+    test.each([
+      ['sign', (account) => account.sign('Dummy message to sign.')],
+      ['signTransaction', (account) => account.signTransaction({ to: RECIPIENT, value: 1 })],
+      ['sendTransaction', (account) => account.sendTransaction({ to: RECIPIENT, value: 1 })],
+      ['transfer', (account) => account.transfer({ token: RECIPIENT, recipient: RECIPIENT, amount: 1 })],
+      ['approve', (account) => account.approve({ token: RECIPIENT, spender: RECIPIENT, amount: 1 })]
+    ])('should throw from %s once disposed', async (_, call) => {
+      const account = new WalletAccountTron(SEED_PHRASE, "0'/0/0", { provider: 'https://tron.web.provider/' })
+
+      account.dispose()
+
+      await expect(call(account)).rejects.toThrow(new DisposalError('The wallet account has been disposed.'))
+    })
+
+    test('should throw a disposal error from approve before checking the provider', async () => {
+      const account = new WalletAccountTron(SEED_PHRASE, "0'/0/0")
+
+      account.dispose()
+
+      await expect(account.approve({ token: RECIPIENT, spender: RECIPIENT, amount: 1 }))
+        .rejects.toThrow(new DisposalError('The wallet account has been disposed.'))
+    })
+
+    test('should still return the address once disposed', async () => {
+      const account = new WalletAccountTron(SEED_PHRASE, "0'/0/0")
+
+      account.dispose()
+
+      expect(await account.getAddress()).toBe(ACCOUNT.address)
+    })
+  })
+
+  describe('signer ownership', () => {
+    test('should wipe the signer it built from a seed', () => {
+      const account = new WalletAccountTron(SEED_PHRASE, "0'/0/0")
+      const { privateKey } = account.keyPair
+
+      account.dispose()
+
+      expect(account.keyPair.privateKey).toBeNull()
+      expect(privateKey.every((byte) => byte === 0)).toBe(true)
+    })
+
+    test('should not wipe a signer supplied by the caller', async () => {
+      const signer = new SeedSignerTron(SEED_PHRASE, ACCOUNT.path)
+      const account = new WalletAccountTron(signer)
+
+      account.dispose()
+
+      expect(signer.disposed).toBe(false)
+      expect(await signer.sign('Dummy message to sign.')).toBe(await new WalletAccountTron(SEED_PHRASE).sign('Dummy message to sign.'))
+    })
+
+    test('should wipe a supplied signer if the account is told to own it', () => {
+      const signer = new SeedSignerTron(SEED_PHRASE, ACCOUNT.path)
+      const account = new WalletAccountTron(signer, { shouldWipeSignerOnDisposal: true })
+
+      account.dispose()
+
+      expect(signer.disposed).toBe(true)
     })
   })
 
@@ -273,6 +423,17 @@ describe('WalletAccountTron', () => {
       expect(signedTx).toEqual({
         ...CONSISTENT_PREBUILT_TX,
         signature: [CONSISTENT_PREBUILT_SIGNATURE]
+      })
+    })
+
+    test('should keep the signatures a prebuilt transaction already carries', async () => {
+      const DUMMY_SIGNATURE = 'aa'.repeat(65)
+
+      const signedTx = await account.signTransaction({ ...CONSISTENT_PREBUILT_TX, signature: [DUMMY_SIGNATURE] })
+
+      expect(signedTx).toEqual({
+        ...CONSISTENT_PREBUILT_TX,
+        signature: [DUMMY_SIGNATURE, CONSISTENT_PREBUILT_SIGNATURE]
       })
     })
 

@@ -37,9 +37,20 @@
 /** @typedef {import('./src/wallet-account-read-only-tron.js').TronWalletConfig} TronWalletConfig */
 /** @typedef {import('./src/wallet-account-read-only-tron.js').TronActivationFee} TronActivationFee */
 /** @typedef {import('./src/wallet-account-tron.js').TronSignedTransaction} TronSignedTransaction */
+/** @typedef {import('./src/wallet-account-tron.js').SignerOptions} SignerOptions */
 
 export { default } from './src/wallet-manager-tron.js'
 
 export { default as WalletAccountReadOnlyTron } from './src/wallet-account-read-only-tron.js'
 
 export { default as WalletAccountTron } from './src/wallet-account-tron.js'
+
+export {
+  DisposalError,
+  InvalidSignerError,
+  NoSuchElementError,
+  UnsupportedOperationError,
+  ValueError
+} from '@tetherto/wdk-wallet'
+
+export { ISigner } from '@tetherto/wdk-wallet'

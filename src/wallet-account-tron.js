@@ -14,20 +14,17 @@
 
 'use strict'
 
-import { TronWeb } from 'tronweb'
-
-// eslint-disable-next-line camelcase
-import { keccak_256 } from '@noble/hashes/sha3'
-import { secp256k1 } from '@noble/curves/secp256k1'
-import { HDKey } from '@scure/bip32'
-import * as bip39 from 'bip39'
-
-// eslint-disable-next-line camelcase
-import { sodium_memzero } from 'sodium-universal'
+import { DisposalError, ValueError } from '@tetherto/wdk-wallet'
 
 import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js'
 
-/** @typedef {import('@tetherto/wdk-wallet').IWalletAccount} IWalletAccount */
+import SeedSignerTron, { BIP_44_TRON_DERIVATION_PATH_PREFIX } from './signers/seed-signer-tron.js'
+import PrivateKeySignerTron from './signers/private-key-signer-tron.js'
+
+/**
+ * @template TSignedTransaction
+ * @typedef {import('@tetherto/wdk-wallet').IWalletAccount<TSignedTransaction>} IWalletAccount
+ */
 
 /** @typedef {import('@tetherto/wdk-wallet').KeyPair} KeyPair */
 /** @typedef {import('@tetherto/wdk-wallet').TransactionResult} TransactionResult */
@@ -37,6 +34,8 @@ import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js'
 /** @typedef {import('./wallet-account-read-only-tron.js').TronTransaction} TronTransaction */
 /** @typedef {import('./wallet-account-read-only-tron.js').TronWalletConfig} TronWalletConfig */
 /** @typedef {import('./wallet-account-read-only-tron.js').TronActivationFee} TronActivationFee */
+
+/** @typedef {import('./signers/signer-tron.js').ISignerTron} ISignerTron */
 
 /** @typedef {import('tronweb').Types.SignedTransaction} TronSignedTransaction */
 /** @typedef {import('tronweb').Types.Transaction} Transaction */
@@ -48,48 +47,67 @@ import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js'
  * @property {number | bigint} amount - The amount of tokens to approve to the spender.
  */
 
-const BIP_44_TRON_DERIVATION_PATH_PREFIX = "m/44'/195'"
+/**
+ * @typedef {Object} SignerOptions
+ * @property {boolean} [shouldWipeSignerOnDisposal] - If true, wipes the signer given at construction on calls to the 'dispose' method.
+ */
+
+const DEFAULT_ACCOUNT_PATH = "0'/0/0"
+
 const DEFAULT_FEE_LIMIT_SUN = 15_000_000
-
-function getTronAddress (publicKey) {
-  const uncompressedPublicKey = secp256k1.Point.fromHex(publicKey)
-    .toBytes(false)
-    .slice(1)
-
-  const publicKeyHash = keccak_256(uncompressedPublicKey)
-  const addressBytes = publicKeyHash.slice(12)
-  const addressHex = '41' + Buffer.from(addressBytes).toString('hex')
-
-  const address = TronWeb.address.fromHex(addressHex)
-
-  return address
-}
 
 /** @implements {IWalletAccount<TronSignedTransaction>} */
 export default class WalletAccountTron extends WalletAccountReadOnlyTron {
   /**
-   * Creates a new tron wallet account.
+   * Creates a new tron wallet account from a signer.
    *
-   * @param {string | Uint8Array} seed - A [BIP-39](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki) mnemonic seed phrase, or a raw BIP-32 master seed (16-64 bytes).
-   * @param {string} path - The BIP-44 derivation path (e.g. "0'/0/0").
-   * @param {TronWalletConfig} [config] - The configuration object.
+   * @overload
+   * @param {ISignerTron} signer - The tron signer, derived to an account path.
+   * @param {TronWalletConfig & SignerOptions} [config] - The configuration object.
+   * @throws {ValueError} If a derivation path is given along with the signer.
    */
-  constructor (seed, path, config = { }) {
-    if (typeof seed === 'string') {
-      if (!bip39.validateMnemonic(seed)) {
-        throw new Error('The seed phrase is invalid.')
+
+  /**
+   * Creates a new tron wallet account from a seed.
+   *
+   * @overload
+   * @param {string | Uint8Array} seed - A [BIP-39](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki) mnemonic seed phrase, or a raw BIP-32 master seed (16-64 bytes).
+   * @param {string} path - The BIP-44 derivation path, relative to "m/44'/195'" (e.g. "0'/0/0").
+   * @param {TronWalletConfig} [config] - The configuration object.
+   * @throws {ValueError} If the seed phrase or the path is not valid.
+   */
+
+  /**
+   * Creates the first tron wallet account (m/44'/195'/0'/0/0) from a seed.
+   *
+   * @overload
+   * @param {string | Uint8Array} seed - A [BIP-39](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki) mnemonic seed phrase, or a raw BIP-32 master seed (16-64 bytes).
+   * @param {TronWalletConfig} [config] - The configuration object.
+   * @throws {ValueError} If the seed phrase is not valid.
+   */
+  constructor (seedOrSigner, pathOrConfig, config = {}) {
+    const isSeed = typeof seedOrSigner === 'string' || seedOrSigner instanceof Uint8Array
+
+    let signer = seedOrSigner
+
+    if (isSeed) {
+      let path = pathOrConfig
+
+      if (typeof pathOrConfig !== 'string') {
+        path = DEFAULT_ACCOUNT_PATH
+        config = pathOrConfig ?? config
       }
 
-      seed = bip39.mnemonicToSeedSync(seed)
+      signer = new SeedSignerTron(seedOrSigner, `${BIP_44_TRON_DERIVATION_PATH_PREFIX}/${path}`)
+    } else {
+      if (typeof pathOrConfig === 'string') {
+        throw new ValueError('A derivation path cannot be given with a signer; derive the signer instead (e.g. signer.derive(path)).')
+      }
+
+      config = pathOrConfig ?? config
     }
 
-    path = BIP_44_TRON_DERIVATION_PATH_PREFIX + '/' + path
-
-    const account = HDKey.fromMasterSeed(seed).derive(path)
-
-    const address = getTronAddress(account.publicKey)
-
-    super(address, config)
+    super(undefined, config)
 
     /**
      * The tron wallet account configuration.
@@ -99,50 +117,80 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
      */
     this._config = config
 
-    /** @private */
-    this._path = path
+    /**
+     * The tron signer.
+     *
+     * @private
+     * @type {ISignerTron}
+     */
+    this._signer = signer
 
     /**
-     * The account's hd key.
+     * If true, disposes the signer on calls to the 'dispose' method.
      *
      * @protected
-     * @type {HDKey}
+     * @type {boolean}
      */
-    this._account = account
+    this._shouldWipeSignerOnDisposal = isSeed || Boolean(config.shouldWipeSignerOnDisposal)
+
+    /** @private */
+    this._disposed = false
   }
 
   /**
-   * The derivation path's index of this account.
+   * Creates a new tron wallet account from a raw private key. The account owns the signer it creates
+   * and wipes it on {@link dispose}.
    *
-   * @type {number}
+   * @param {string | Uint8Array} privateKey - The raw private key (hex string with or without 0x, or 32 bytes).
+   * @param {TronWalletConfig} [config] - The configuration object.
+   * @returns {WalletAccountTron} The wallet account.
+   * @throws {ValueError} If the private key is not valid.
    */
-  get index () {
-    return +this._path.split('/').pop()
+  static fromPrivateKey (privateKey, config = {}) {
+    return new WalletAccountTron(new PrivateKeySignerTron(privateKey), { ...config, shouldWipeSignerOnDisposal: true })
   }
 
   /**
-   * The derivation path of this account (see [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki)).
+   * True if the wallet account has been disposed.
    *
-   * @type {string}
+   * @type {boolean}
+   */
+  get disposed () {
+    return this._disposed
+  }
+
+  /**
+   * The derivation path of this account (see [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki)),
+   * or null for an account backed by a non-HD signer.
+   *
+   * @type {string | null}
    */
   get path () {
-    return this._path
+    return this._signer.path
   }
 
   /**
    * The account's key pair.
    *
-   * The uint8 arrays are bound to the wallet account, so any external change will reflect to the internal representation. For this reason,
+   * The uint8 arrays are the signer's own, so any external change will reflect to the signer's internal representation. For this reason,
    * it's strongly recommended to treat the key pair as a read-only view of the keys. While it's still technically possible to alter their
    * content, client code should never do so.
    *
-   * @type {KeyPair}
+   * Null if the account's signer does not expose key material.
+   *
+   * @type {KeyPair | null}
    */
   get keyPair () {
-    return {
-      privateKey: this._account.privateKey ?? null,
-      publicKey: this._account.publicKey
-    }
+    return this._signer.keyPair
+  }
+
+  /**
+   * Returns the account's address.
+   *
+   * @returns {Promise<string>} The account's address.
+   */
+  async getAddress () {
+    return await this._signer.getAddress()
   }
 
   /**
@@ -150,18 +198,14 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    *
    * @param {string} message - The message to sign.
    * @returns {Promise<string>} The message's signature.
+   * @throws {DisposalError} If the wallet account has been disposed.
    */
   async sign (message) {
-    const messageBytes = Buffer.from(message, 'utf8')
-    const prefix = Buffer.from(`\x19TRON Signed Message:\n${messageBytes.length}`, 'utf8')
-    const messageWithPrefixBytes = Buffer.concat([prefix, messageBytes])
-    const hash = keccak_256(messageWithPrefixBytes)
+    if (this._disposed) {
+      throw new DisposalError('The wallet account has been disposed.')
+    }
 
-    const signature = secp256k1.sign(hash, this._account.privateKey)
-    const signatureWithRecovery = new Uint8Array([...signature.toCompactRawBytes(), 27 + signature.recovery])
-    const hex = Buffer.from(signatureWithRecovery).toString('hex')
-
-    return '0x' + hex
+    return await this._signer.sign(message)
   }
 
   /**
@@ -169,9 +213,14 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    *
    * @param {TronTransaction} tx - The transaction to sign.
    * @returns {Promise<TronSignedTransaction>} The signed transaction.
+   * @throws {DisposalError} If the wallet account has been disposed.
    * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
    */
   async signTransaction (tx) {
+    if (this._disposed) {
+      throw new DisposalError('The wallet account has been disposed.')
+    }
+
     if (!this._tronWeb) {
       throw new Error('The wallet must be connected to tron web to sign transactions.')
     }
@@ -207,9 +256,14 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    *
    * @param {TronTransaction | TronSignedTransaction} tx - The transaction, or a signed transaction.
    * @returns {Promise<TransactionResult & TronActivationFee>} The transaction's result.
+   * @throws {DisposalError} If the wallet account has been disposed.
    * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
    */
   async sendTransaction (tx) {
+    if (this._disposed) {
+      throw new DisposalError('The wallet account has been disposed.')
+    }
+
     if (!this._tronWeb) {
       throw new Error('The wallet must be connected to tron web to send transactions.')
     }
@@ -268,9 +322,14 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    *
    * @param {TransferOptions} options - The transfer's options.
    * @returns {Promise<TransferResult>} The transfer's result.
+   * @throws {DisposalError} If the wallet account has been disposed.
    * @throws {Error} If the transfer's cost exceeds the maximum transfer fee option.
    */
   async transfer ({ token, recipient, amount }) {
+    if (this._disposed) {
+      throw new DisposalError('The wallet account has been disposed.')
+    }
+
     if (!this._tronWeb) {
       throw new Error('The wallet must be connected to tron web to transfer tokens.')
     }
@@ -309,9 +368,14 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    *
    * @param {ApproveOptions} options - The approve options.
    * @returns {Promise<TransactionResult & TronActivationFee>} The transaction's result.
+   * @throws {DisposalError} If the wallet account has been disposed.
    * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
    */
   async approve (options) {
+    if (this._disposed) {
+      throw new DisposalError('The wallet account has been disposed.')
+    }
+
     if (!this._tronWeb) {
       throw new Error('The wallet must be connected to tron web to approve funds.')
     }
@@ -343,31 +407,19 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
   }
 
   /**
-   * Disposes the wallet account, erasing the private key from the memory.
+   * Disposes the wallet account. The signer given at construction, and its private key, is wiped only if the
+   * account owns it (see {@link SignerOptions}); a caller-owned signer is left for the caller to dispose.
    */
   dispose () {
-    sodium_memzero(this._account.privKeyBytes)
+    if (this._shouldWipeSignerOnDisposal) {
+      this._signer.dispose()
+    }
 
-    this._account.privKeyBytes = undefined
-
-    this._account.privKey = undefined
+    this._disposed = true
   }
 
   /** @private */
   async _signTransaction (transaction) {
-    const transactionBytes = Buffer.from(transaction.txID, 'hex')
-
-    const signature = secp256k1.sign(transactionBytes, this._account.privateKey, { lowS: true })
-
-    const r = signature.r.toString(16).padStart(64, '0')
-    const s = signature.s.toString(16).padStart(64, '0')
-    const v = signature.recovery.toString(16).padStart(2, '0')
-
-    const serializedSignature = r + s + v
-
-    return {
-      ...transaction,
-      signature: [serializedSignature]
-    }
+    return await this._signer.signTransaction(transaction)
   }
 }
