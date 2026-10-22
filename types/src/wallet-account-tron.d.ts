@@ -24,6 +24,14 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron impleme
      * @type {HDKey}
      */
     protected _account: HDKey;
+    /** @private */
+    private _disposed;
+    /**
+     * True if the account has been disposed.
+     *
+     * @type {boolean}
+     */
+    get disposed(): boolean;
     /**
      * The derivation path's index of this account.
      *
@@ -51,6 +59,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron impleme
      *
      * @param {string} message - The message to sign.
      * @returns {Promise<string>} The message's signature.
+     * @throws {DisposalError} If the account has been disposed.
      */
     sign(message: string): Promise<string>;
     /**
@@ -59,6 +68,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron impleme
      * @param {TronTransaction} tx - The transaction to sign.
      * @returns {Promise<TronSignedTransaction>} The signed transaction.
      * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
+     * @throws {DisposalError} If the account has been disposed.
      */
     signTransaction(tx: TronTransaction): Promise<TronSignedTransaction>;
     /**
@@ -74,6 +84,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron impleme
      * @param {TronTransaction | TronSignedTransaction} tx - The transaction, or a signed transaction.
      * @returns {Promise<TransactionResult & TronActivationFee>} The transaction's result.
      * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
+     * @throws {DisposalError} If the account has been disposed.
      */
     sendTransaction(tx: TronTransaction | TronSignedTransaction): Promise<TransactionResult & TronActivationFee>;
     /** @private */
@@ -87,6 +98,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron impleme
      * @param {TransferOptions} options - The transfer's options.
      * @returns {Promise<TransferResult>} The transfer's result.
      * @throws {Error} If the transfer's cost exceeds the maximum transfer fee option.
+     * @throws {DisposalError} If the account has been disposed.
      */
     transfer(options: TransferOptions): Promise<TransferResult>;
     /**
@@ -95,6 +107,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron impleme
      * @param {ApproveOptions} options - The approve options.
      * @returns {Promise<TransactionResult & TronActivationFee>} The transaction's result.
      * @throws {Error} If the transaction's cost exceeds the maximum transaction fee option.
+     * @throws {DisposalError} If the account has been disposed.
      */
     approve(options: ApproveOptions): Promise<TransactionResult & TronActivationFee>;
     /**
