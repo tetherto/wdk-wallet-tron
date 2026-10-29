@@ -248,7 +248,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
 
     const txOwner = transaction.raw_data?.contract?.[0]?.parameter?.value?.owner_address
 
-    if (txOwner && txOwner.toLowerCase() !== ownerHex) {
+    if (txOwner?.toLowerCase() !== ownerHex) {
       throw new Error('The transaction owner does not match the wallet account address.')
     }
   }

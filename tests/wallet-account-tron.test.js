@@ -59,6 +59,24 @@ jest.unstable_mockModule('tronweb', () => {
 
 const { WalletAccountTron, WalletAccountReadOnlyTron } = await import('../index.js')
 
+const BUILT_RAW_DATA = {
+  contract: [{
+    type: 'TransferContract',
+    parameter: {
+      value: {
+        amount: 1_000_000,
+        owner_address: TronWeb.address.toHex(ACCOUNT.address),
+        to_address: TronWeb.address.toHex('TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD')
+      },
+      type_url: 'type.googleapis.com/protocol.TransferContract'
+    }
+  }],
+  ref_block_bytes: '1234',
+  ref_block_hash: '0011223344556677',
+  expiration: 1700000000000,
+  timestamp: 1699999000000
+}
+
 describe('WalletAccountTron', () => {
   let account
 
@@ -157,6 +175,26 @@ describe('WalletAccountTron', () => {
   }
   const CONSISTENT_PREBUILT_SIGNATURE = '90772e79b238b0ce83446675f091e48a5ee7d3e76afcd830d21e91247aa9f7800d91038aaada318c28c6f01a2563a4a29b970bc651c9bdff5e7f70daf9a4f7e101'
 
+  const consistentTransferTx = (value) => {
+    const { transaction: utils } = new TronWeb({ fullHost: 'https://tron.web.provider/' }).utils
+    const tx = {
+      visible: false,
+      raw_data: {
+        contract: [{
+          type: 'TransferContract',
+          parameter: { value, type_url: 'type.googleapis.com/protocol.TransferContract' }
+        }],
+        ref_block_bytes: '1234',
+        ref_block_hash: '0011223344556677',
+        expiration: 1700000000000,
+        timestamp: 1699999000000
+      }
+    }
+    const pb = utils.txJsonToPb(tx)
+
+    return { ...tx, txID: utils.txPbToTxID(pb).replace(/^0x/, ''), raw_data_hex: utils.txPbToRawDataHex(pb) }
+  }
+
   describe('signTransaction', () => {
     test('should throw if transaction fee exceeds the transaction max fee configuration', async () => {
       const TRANSACTION = {
@@ -165,6 +203,7 @@ describe('WalletAccountTron', () => {
       }
       const DUMMY_SEND_TRX_RESULT = {
         txID: '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f',
+        raw_data: BUILT_RAW_DATA,
         raw_data_hex: '0a' + '00'.repeat(100)
       }
 
@@ -176,6 +215,8 @@ describe('WalletAccountTron', () => {
         NetLimit: 0,
         NetUsed: 0
       })
+
+      getAccountMock.mockResolvedValue({ address: RECIPIENT })
 
       const accountWithMaxFee = new WalletAccountTron(SEED_PHRASE, "0'/0/0", {
         provider: 'https://tron.web.provider/',
@@ -193,6 +234,7 @@ describe('WalletAccountTron', () => {
       }
       const DUMMY_SEND_TRX_RESULT = {
         txID: '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f',
+        raw_data: BUILT_RAW_DATA,
         raw_data_hex: '0a' + '00'.repeat(100)
       }
       const EXPECTED_SIGNATURE = 'e2fbd0590d2a6150952afdcdb8c0b137a8828fe45dacc6f17f552b10234baa9231811488104983c4d4333ad51c90343801aa72e41b1d576719cc798c4c98546100'
@@ -205,6 +247,8 @@ describe('WalletAccountTron', () => {
         NetLimit: 0,
         NetUsed: 0
       })
+
+      getAccountMock.mockResolvedValue({ address: RECIPIENT })
 
       const accountWithMaxFee = new WalletAccountTron(SEED_PHRASE, "0'/0/0", {
         provider: 'https://tron.web.provider/',
@@ -226,6 +270,7 @@ describe('WalletAccountTron', () => {
       }
       const DUMMY_SEND_TRX_RESULT = {
         txID: '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f',
+        raw_data: BUILT_RAW_DATA,
         raw_data_hex: '0a' + '00'.repeat(100)
       }
       const EXPECTED_SIGNATURE = 'e2fbd0590d2a6150952afdcdb8c0b137a8828fe45dacc6f17f552b10234baa9231811488104983c4d4333ad51c90343801aa72e41b1d576719cc798c4c98546100'
@@ -238,6 +283,8 @@ describe('WalletAccountTron', () => {
         NetLimit: 0,
         NetUsed: 0
       })
+
+      getAccountMock.mockResolvedValue({ address: RECIPIENT })
 
       const accountWithMaxFee = new WalletAccountTron(SEED_PHRASE, "0'/0/0", {
         provider: 'https://tron.web.provider/',
@@ -302,6 +349,27 @@ describe('WalletAccountTron', () => {
       await expect(account.signTransaction(withoutTxID))
         .rejects.toThrow('Invalid transaction.')
     })
+
+    test('should refuse a prebuilt transaction that names no owner', async () => {
+      const tx = consistentTransferTx({
+        to_address: TronWeb.address.toHex(RECIPIENT),
+        amount: 1_000_000
+      })
+
+      await expect(account.signTransaction(tx))
+        .rejects.toThrow('The transaction owner does not match the wallet account address.')
+    })
+
+    test('should refuse a prebuilt transaction whose owner is empty', async () => {
+      const tx = consistentTransferTx({
+        owner_address: '',
+        to_address: TronWeb.address.toHex(RECIPIENT),
+        amount: 1_000_000
+      })
+
+      await expect(account.signTransaction(tx))
+        .rejects.toThrow('The transaction owner does not match the wallet account address.')
+    })
   })
 
   describe('quoteSendTransaction', () => {
@@ -349,7 +417,7 @@ describe('WalletAccountTron', () => {
 
       sendTrxMock.mockResolvedValue(DUMMY_SEND_TRX_RESULT)
       sendRawTransactionMock.mockResolvedValue({ txid: DUMMY_TX_ID })
-      getAccountMock.mockResolvedValue({ address: RECIPIENT }) // recipient already activated
+      getAccountMock.mockResolvedValue({ address: RECIPIENT })
       getAccountResourcesMock.mockResolvedValue({
         freeNetLimit: 5000,
         freeNetUsed: 0,
@@ -532,10 +600,13 @@ describe('WalletAccountTron', () => {
       }
       const DUMMY_SEND_TRX_RESULT = {
         txID: '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f',
+        raw_data: BUILT_RAW_DATA,
         raw_data_hex: '0a' + '00'.repeat(100)
       }
 
       sendTrxMock.mockResolvedValue(DUMMY_SEND_TRX_RESULT)
+
+      getAccountMock.mockResolvedValue({ address: TRANSACTION.to })
 
       getAccountResourcesMock.mockResolvedValue({
         freeNetLimit: 0,
@@ -561,6 +632,7 @@ describe('WalletAccountTron', () => {
       const DUMMY_TX_ID = 'abc123def456'
       const DUMMY_SEND_TRX_RESULT = {
         txID: '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f',
+        raw_data: BUILT_RAW_DATA,
         raw_data_hex: '0a' + '00'.repeat(100)
       }
 
@@ -595,6 +667,7 @@ describe('WalletAccountTron', () => {
       const DUMMY_TX_ID = 'abc123def456'
       const DUMMY_SEND_TRX_RESULT = {
         txID: '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f',
+        raw_data: BUILT_RAW_DATA,
         raw_data_hex: '0a' + '00'.repeat(100)
       }
 
