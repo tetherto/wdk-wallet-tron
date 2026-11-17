@@ -45,6 +45,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      * @param {TronTransaction} tx - The transaction.
      * @returns {Promise<Omit<TransactionResult, 'hash'> & TronActivationFee>} The transaction's quotes.
      * @throws {ProviderRequiredError} If the wallet is not connected to tron web.
+     * @throws {AssertionError} If the node's latest block is more than one minute ahead of the device clock.
      */
     quoteSendTransaction(tx: TronTransaction): Promise<Omit<TransactionResult, "hash"> & TronActivationFee>;
     /**
@@ -140,8 +141,18 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
      * @param {TronTransaction} tx - The transaction.
      * @returns {Promise<Transaction>} The unsigned tron web transaction.
      * @throws {Error} If the transaction is invalid.
+     * @throws {AssertionError} If the node's latest block is more than one minute ahead of the device clock.
      */
     protected _buildTransaction(tx: TronTransaction): Promise<Transaction>;
+    /**
+     * Returns the reference block and validity window for a new transaction. The reference block is the node's latest
+     * block, and the transaction expires one minute after that block's time.
+     *
+     * @protected
+     * @returns {Promise<Partial<Transaction['raw_data']>>} The block header to build the transaction with.
+     * @throws {AssertionError} If the node's latest block is more than one minute ahead of the device clock.
+     */
+    protected _getBlockHeader(): Promise<Partial<Transaction["raw_data"]>>;
     /**
      * Quotes the fee of an already-built tron web transaction. The fee is derived from
      * the transaction's contract type, so this works for every kind of transaction:
@@ -277,7 +288,7 @@ export type TronSmartContractCall = {
      */
     parameters?: ContractFunctionParameter[];
     /**
-     * - The options the call is built with (e.g. `feeLimit`, `callValue`). The call is always built locally; the query options `_isConstant`, `estimateEnergy` and `confirmed` are ignored.
+     * - The options the call is built with (e.g. `feeLimit`, `callValue`). The call is always built locally; the query options `_isConstant`, `estimateEnergy` and `confirmed` and the `blockHeader` option are ignored.
      */
     options?: TriggerSmartContractOptions;
 };

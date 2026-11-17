@@ -12,6 +12,7 @@ const getTransactionInfoMock = jest.fn()
 const getUnconfirmedTransactionInfoMock = jest.fn()
 const getConfirmedCurrentBlockMock = jest.fn()
 const getChainParametersMock = jest.fn()
+const getCurrentRefBlockParamsMock = jest.fn()
 
 const triggerConstantContractMock = jest.fn()
 const triggerSmartContractMock = jest.fn()
@@ -29,7 +30,8 @@ jest.unstable_mockModule('tronweb', () => {
       getTransactionInfo: getTransactionInfoMock,
       getUnconfirmedTransactionInfo: getUnconfirmedTransactionInfoMock,
       getConfirmedCurrentBlock: getConfirmedCurrentBlockMock,
-      getChainParameters: getChainParametersMock
+      getChainParameters: getChainParametersMock,
+      getCurrentRefBlockParams: getCurrentRefBlockParamsMock
     }
 
     provider.transactionBuilder = {
@@ -53,11 +55,20 @@ jest.unstable_mockModule('tronweb', () => {
 
 const { WalletAccountReadOnlyTron } = await import('../index.js')
 
+const DUMMY_REF_BLOCK_PARAMS = {
+  ref_block_bytes: '1234',
+  ref_block_hash: '0011223344556677',
+  expiration: 1_700_000_060_000,
+  timestamp: 1_700_000_000_000
+}
+
 describe('WalletAccountReadOnlyTron', () => {
   let account
 
   beforeEach(() => {
     jest.clearAllMocks()
+
+    getCurrentRefBlockParamsMock.mockResolvedValue(DUMMY_REF_BLOCK_PARAMS)
 
     account = new WalletAccountReadOnlyTron(ADDRESS, {
       provider: 'https://tron.web.provider/'
@@ -213,7 +224,7 @@ describe('WalletAccountReadOnlyTron', () => {
 
       const { fee, activationFee } = await account.quoteSendTransaction(TRANSACTION)
 
-      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ADDRESS)
+      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ADDRESS, { blockHeader: DUMMY_REF_BLOCK_PARAMS })
       expect(getAccountMock).toHaveBeenCalledWith(TronWeb.address.toHex(RECIPIENT))
       expect(getAccountResourcesMock).toHaveBeenCalledWith(ADDRESS)
 
@@ -240,7 +251,7 @@ describe('WalletAccountReadOnlyTron', () => {
 
       const { fee, activationFee } = await account.quoteSendTransaction(TRANSACTION)
 
-      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ADDRESS)
+      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ADDRESS, { blockHeader: DUMMY_REF_BLOCK_PARAMS })
       expect(getAccountMock).toHaveBeenCalledWith(TronWeb.address.toHex(ADDRESS))
       expect(getAccountResourcesMock).toHaveBeenCalledWith(ADDRESS)
       expect(fee).toBe(EXPECTED_FEE)
@@ -266,7 +277,7 @@ describe('WalletAccountReadOnlyTron', () => {
 
       const { fee, activationFee } = await account.quoteSendTransaction(TRANSACTION)
 
-      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ADDRESS)
+      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ADDRESS, { blockHeader: DUMMY_REF_BLOCK_PARAMS })
       expect(getAccountMock).toHaveBeenCalledWith(TronWeb.address.toHex(ADDRESS))
       expect(getAccountResourcesMock).toHaveBeenCalledWith(ADDRESS)
       expect(fee).toBe(EXPECTED_FEE)
@@ -322,7 +333,7 @@ describe('WalletAccountReadOnlyTron', () => {
       expect(triggerSmartContractMock).toHaveBeenCalledWith(
         CONTRACT,
         'approve(address,uint256)',
-        { feeLimit: 15_000_000, txLocal: true },
+        { feeLimit: 15_000_000, txLocal: true, blockHeader: DUMMY_REF_BLOCK_PARAMS },
         CALL.parameters,
         TronWeb.address.toHex(ADDRESS)
       )
