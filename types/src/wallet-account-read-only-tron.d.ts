@@ -200,6 +200,15 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
         energy_used?: number;
     }): Promise<bigint>;
     /**
+     * Quotes the costs of a TRC-20 transfer operation, split by resource.
+     *
+     * @protected
+     * @param {TransferOptions} options - The transfer's options.
+     * @returns {Promise<TronContractCosts>} The transfer's energy and bandwidth costs.
+     * @throws {TransferError} If the account's token balance is below the transfer amount.
+     */
+    protected _quoteTransferCosts({ token, recipient, amount }: TransferOptions): Promise<TronContractCosts>;
+    /**
      * Returns whether a committed transaction executed successfully.
      *
      * @protected
@@ -298,7 +307,7 @@ export type TronWalletConfig = {
      */
     retries?: number;
     /**
-     * - The maximum fee amount for transfer operations.
+     * - The maximum fee amount for transfer operations. Less the bandwidth cost, it is also the most a transfer may burn for energy on chain.
      */
     transferMaxFee?: number | bigint;
     /**
@@ -342,6 +351,19 @@ export type EstimateEnergyCostValue = {
      * - The amount of tronixs (in suns) sent along with the call.
      */
     call_value?: number;
+};
+/**
+ * The costs of a smart contract call, split by resource.
+ */
+export type TronContractCosts = {
+    /**
+     * - The TRX (in suns) burned for the energy the account's staked energy does not cover.
+     */
+    energyCost: bigint;
+    /**
+     * - The TRX (in suns) burned for the bandwidth the account's free and staked bandwidth do not cover.
+     */
+    bandwidthCost: bigint;
 };
 import { WalletAccountReadOnly } from '@tetherto/wdk-wallet';
 import { TronWeb } from 'tronweb';

@@ -71,7 +71,7 @@ import { TronWeb, Trx } from 'tronweb'
  * @typedef {Object} TronWalletConfig
  * @property {string | TronWeb | (string | TronWeb)[]} [provider] - The url of the tron web provider, or an instance of the {@link TronWeb} class. It's also possible to provide a list of urls or {@link TronWeb} instances instead. In such case, connection errors will cause the wallet to automatically fallback on the next provider in the list. When passing {@link TronWeb} instances, the first one becomes the wallet's primary client; the others contribute only their `fullNode` / `solidityNode` / `eventServer` to the failover pool.
  * @property {number} [retries] - If set and if 'provider' is a list of urls or {@link TronWeb} instances, the number of additional retry attempts after the initial call fails. Total attempts = `1 + retries`. For example, `retries: 3` with 4 providers will try each provider once before throwing. If `retries` exceeds the number of providers, the failover will loop back and retry already-failed providers in round-robin order. Default: 3.
- * @property {number | bigint} [transferMaxFee] - The maximum fee amount for transfer operations.
+ * @property {number | bigint} [transferMaxFee] - The maximum fee amount for transfer operations. Less the bandwidth cost, it is also the most a transfer may burn for energy on chain.
  * @property {number | bigint} [transactionMaxFee] - The maximum fee amount for sendTransaction and signTransaction operations.
  */
 
@@ -94,6 +94,14 @@ import { TronWeb, Trx } from 'tronweb'
  * @property {string} data - The encoded call data.
  * @property {string} owner_address - The caller's address (hex).
  * @property {number} [call_value] - The amount of tronixs (in suns) sent along with the call.
+ */
+
+/**
+ * The costs of a smart contract call, split by resource.
+ *
+ * @typedef {Object} TronContractCosts
+ * @property {bigint} energyCost - The TRX (in suns) burned for the energy the account's staked energy does not cover.
+ * @property {bigint} bandwidthCost - The TRX (in suns) burned for the bandwidth the account's free and staked bandwidth do not cover.
  */
 
 const BANDWIDTH_PRICE = 1_000n
@@ -254,34 +262,10 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
       throw new ProviderRequiredError('The wallet must be connected to tron web to quote transfer operations.')
     }
 
-    const address = await this.getAddress()
-    const addressHex = this._tronWeb.address.toHex(address)
-
-    const parameters = [
-      { type: 'address', value: this._tronWeb.address.toHex(recipient) },
-      { type: 'uint256', value: amount }
-    ]
-
-    let simulation
-    try {
-      simulation = await this._tronWeb.transactionBuilder
-        .triggerConstantContract(token, 'transfer(address,uint256)', {}, parameters, addressHex)
-    } catch (error) {
-      if (error.message?.includes('REVERT')) {
-        const balance = await this.getTokenBalance(token)
-        if (balance < BigInt(amount)) {
-          throw new TransferError('Insufficient token balance for the transfer.', {
-            reason: TransferErrorReason.INSUFFICIENT_TOKEN_BALANCE,
-            cause: error
-          })
-        }
-      }
-
-      throw error
-    }
+    const { energyCost, bandwidthCost } = await this._quoteTransferCosts({ token, recipient, amount })
 
     return {
-      fee: await this._estimateContractFee(simulation)
+      fee: energyCost + bandwidthCost
     }
   }
 
@@ -605,6 +589,51 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    * @returns {Promise<bigint>} The estimated fee in SUN.
    */
   async _estimateContractFee ({ transaction, energy_used: energyUsed }) {
+    const { energyCost, bandwidthCost } = await this._getContractCosts({ transaction, energy_used: energyUsed })
+
+    return energyCost + bandwidthCost
+  }
+
+  /**
+   * Quotes the costs of a TRC-20 transfer operation, split by resource.
+   *
+   * @protected
+   * @param {TransferOptions} options - The transfer's options.
+   * @returns {Promise<TronContractCosts>} The transfer's energy and bandwidth costs.
+   * @throws {TransferError} If the account's token balance is below the transfer amount.
+   */
+  async _quoteTransferCosts ({ token, recipient, amount }) {
+    const address = await this.getAddress()
+    const addressHex = this._tronWeb.address.toHex(address)
+
+    const parameters = [
+      { type: 'address', value: this._tronWeb.address.toHex(recipient) },
+      { type: 'uint256', value: amount }
+    ]
+
+    let simulation
+    try {
+      simulation = await this._tronWeb.transactionBuilder
+        .triggerConstantContract(token, 'transfer(address,uint256)', {}, parameters, addressHex)
+    } catch (error) {
+      if (error.message?.includes('REVERT')) {
+        const balance = await this.getTokenBalance(token)
+        if (balance < BigInt(amount)) {
+          throw new TransferError('Insufficient token balance for the transfer.', {
+            reason: TransferErrorReason.INSUFFICIENT_TOKEN_BALANCE,
+            cause: error
+          })
+        }
+      }
+
+      throw error
+    }
+
+    return await this._getContractCosts(simulation)
+  }
+
+  /** @private */
+  async _getContractCosts ({ transaction, energy_used: energyUsed }) {
     const address = await this.getAddress()
 
     const [chainParameters, resources] = await Promise.all([
@@ -614,11 +643,11 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
 
     const { value: energyPrice } = chainParameters.find(({ key }) => key === 'getEnergyFee')
 
-    const totalEnergyCost = this._netEnergyCost(energyUsed, energyPrice, resources)
+    const energyCost = this._netEnergyCost(energyUsed, energyPrice, resources)
 
     const bandwidthCost = await this._getBandwidthCost(transaction, { isActivation: false, resources })
 
-    return totalEnergyCost + bandwidthCost
+    return { energyCost, bandwidthCost }
   }
 
   /**
