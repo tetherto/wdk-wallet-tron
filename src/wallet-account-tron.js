@@ -444,13 +444,13 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
 
   /** @private */
   async _broadcastTransaction (signedTransaction) {
-    const { result, code, Error: error, txid } = await this._tronWeb.trx.sendRawTransaction(signedTransaction)
+    const { result, code, Error: error } = await this._tronWeb.trx.sendRawTransaction(signedTransaction)
 
     if (result !== true && code !== DUPLICATE_TRANSACTION_CODE) {
-      throw new ProviderError(`The node refused the transaction (${code ?? error}).`, { reason: ProviderErrorReason.INTERNAL_SERVER_ERROR })
+      throw new ProviderError(`The node refused the transaction (${code ?? error ?? 'no result'}).`, { reason: ProviderErrorReason.INTERNAL_SERVER_ERROR })
     }
 
-    return txid
+    return signedTransaction.txID
   }
 
   /** @private */

@@ -689,7 +689,7 @@ describe('WalletAccountTron', () => {
 
     test('should successfully send a tronix transfer', async () => {
       const TRANSACTION = { to: RECIPIENT, value: 1_000_000 }
-      const DUMMY_TX_ID = 'abc123def456'
+      const DUMMY_TX_ID = '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f'
       const DUMMY_SEND_TRX_RESULT = transferTx(RECIPIENT)
       const EXPECTED_SIGNATURE = 'e2fbd0590d2a6150952afdcdb8c0b137a8828fe45dacc6f17f552b10234baa9231811488104983c4d4333ad51c90343801aa72e41b1d576719cc798c4c98546100'
 
@@ -761,7 +761,7 @@ describe('WalletAccountTron', () => {
         parameters: [{ type: 'address', value: RECIPIENT }, { type: 'uint256', value: 100 }],
         options: { feeLimit: 15_000_000 }
       }
-      const DUMMY_TX_ID = 'contractcall123'
+      const DUMMY_TX_ID = '12a406f767b30e00b317758aa25fcddc0ff8a329b7cad741dd204676d0e6c5ce'
       const DUMMY_TRANSACTION = {
         txID: '12a406f767b30e00b317758aa25fcddc0ff8a329b7cad741dd204676d0e6c5ce',
         raw_data: {
@@ -838,12 +838,12 @@ describe('WalletAccountTron', () => {
       const SIGNATURE = '35e63169bc6ac6ea82e1df9d1f70e1f90c820a01ce1ff14dce0a28efb66522aa1851011b8a2ce0488e50d0524c2d128b014ab55580d5ba5a238d9a65d6e5479700'
       const EXPECTED_FEE = 264_000n
 
-      sendRawTransactionMock.mockResolvedValue({ result: true, txid: 'freeze123' })
+      sendRawTransactionMock.mockResolvedValue({ result: true, txid: 'fa99c9a1f545f95246b98dba67211a62726f1204e60541ed7d00bae880b47e11' })
       getAccountResourcesMock.mockResolvedValue({ freeNetLimit: 0, freeNetUsed: 0, NetLimit: 0, NetUsed: 0 })
 
       const { hash, fee, activationFee } = await account.sendTransaction(PREBUILT)
 
-      expect(hash).toBe('freeze123')
+      expect(hash).toBe(PREBUILT.txID)
       expect(fee).toBe(EXPECTED_FEE)
       expect(activationFee).toBe(0n)
       expect(triggerConstantContractMock).not.toHaveBeenCalled()
@@ -878,7 +878,7 @@ describe('WalletAccountTron', () => {
 
     test('should broadcast an already-signed transaction', async () => {
       const RECIPIENT = 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD'
-      const DUMMY_TX_ID = 'abc123def456'
+      const DUMMY_TX_ID = '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f'
       const SIGNED_TX = {
         txID: '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f',
         raw_data_hex: '0a' + '00'.repeat(100),
@@ -949,7 +949,7 @@ describe('WalletAccountTron', () => {
         to: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
         value: 1_000_000
       }
-      const DUMMY_TX_ID = 'abc123def456'
+      const DUMMY_TX_ID = '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f'
       const DUMMY_SEND_TRX_RESULT = {
         txID: '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f',
         raw_data: BUILT_RAW_DATA,
@@ -990,7 +990,7 @@ describe('WalletAccountTron', () => {
         to: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
         value: 1_000_000
       }
-      const DUMMY_TX_ID = 'abc123def456'
+      const DUMMY_TX_ID = '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f'
       const DUMMY_SEND_TRX_RESULT = {
         txID: '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f',
         raw_data: BUILT_RAW_DATA,
@@ -1040,7 +1040,7 @@ describe('WalletAccountTron', () => {
         recipient: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
         amount: 100_000_000
       }
-      const DUMMY_TX_ID = 'xyz789abc123'
+      const DUMMY_TX_ID = '12a406f767b30e00b317758aa25fcddc0ff8a329b7cad741dd204676d0e6c5ce'
 
       triggerConstantContractMock.mockResolvedValue({
         constant_result: ['0000000000000000000000000000000000000000000000000000000000000064'],
@@ -1221,7 +1221,7 @@ describe('WalletAccountTron', () => {
       amount: 100_000_000n
     }
 
-    const DUMMY_TX_ID = 'approvecall123'
+    const DUMMY_TX_ID = '12a406f767b30e00b317758aa25fcddc0ff8a329b7cad741dd204676d0e6c5ce'
 
     const DUMMY_TRANSACTION = {
       txID: '12a406f767b30e00b317758aa25fcddc0ff8a329b7cad741dd204676d0e6c5ce',
