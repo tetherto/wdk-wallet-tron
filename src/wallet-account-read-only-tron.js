@@ -14,7 +14,7 @@
 
 'use strict'
 
-import { WalletAccountReadOnly, NoSuchElementError, ProviderRequiredError, TransferError, TransferErrorReason, ValueError } from '@tetherto/wdk-wallet'
+import { WalletAccountReadOnly, AssertionError, NoSuchElementError, ProviderRequiredError, TransferError, TransferErrorReason, ValueError } from '@tetherto/wdk-wallet'
 
 import FailoverProvider from '@tetherto/wdk-failover-provider'
 
@@ -55,7 +55,7 @@ import { TronWeb, Trx } from 'tronweb'
  * @property {string} contractAddress - The address of the smart contract to call.
  * @property {string} functionSelector - The function selector to invoke (e.g. 'transfer(address,uint256)').
  * @property {ContractFunctionParameter[]} [parameters] - The parameters to pass to the function (default: []).
- * @property {TriggerSmartContractOptions} [options] - The trigger options (e.g. `feeLimit`, `callValue`).
+ * @property {TriggerSmartContractOptions} [options] - The options the call is built with (e.g. `feeLimit`, `callValue`). The call is always built locally; the query options `_isConstant`, `estimateEnergy` and `confirmed` and the `blockHeader` option are ignored.
  */
 
 /**
@@ -101,6 +101,14 @@ const ACCOUNT_ACTIVATION_FEE_SUN = 1_000_000n
 const ACCOUNT_ACTIVATION_BANDWIDTH_COST = 100_000n
 const DEFAULT_FEE_LIMIT_SUN = 15_000_000
 const DEFAULT_WAIT_TIMEOUT_MS = 90_000
+/**
+ * How long a built transaction stays valid, from the reference block's time (the same window tron web uses).
+ */
+const TRANSACTION_EXPIRATION_MS = 60_000
+/**
+ * How far ahead of the device clock the node's latest block may be before it is refused.
+ */
+const BLOCK_TIME_TOLERANCE_MS = 60_000
 /**
  * The length of an ECDSA signature in bytes.
  */
@@ -229,6 +237,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    * @param {TronTransaction} tx - The transaction.
    * @returns {Promise<Omit<TransactionResult, 'hash'> & TronActivationFee>} The transaction's quotes.
    * @throws {ProviderRequiredError} If the wallet is not connected to tron web.
+   * @throws {AssertionError} If the node's latest block is more than one minute ahead of the device clock.
    */
   async quoteSendTransaction (tx) {
     if (!this._tronWeb) {
@@ -471,6 +480,7 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
    * @param {TronTransaction} tx - The transaction.
    * @returns {Promise<Transaction>} The unsigned tron web transaction.
    * @throws {Error} If the transaction is invalid.
+   * @throws {AssertionError} If the node's latest block is more than one minute ahead of the device clock.
    */
   async _buildTransaction (tx) {
     if (WalletAccountReadOnlyTron._isPrebuiltTransaction(tx)) {
@@ -478,12 +488,12 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     }
 
     if (WalletAccountReadOnlyTron._isSmartContractCall(tx)) {
-      const { contractAddress, functionSelector, parameters = [], options = {} } = tx
+      const { contractAddress, functionSelector, parameters = [], options: { _isConstant, estimateEnergy, confirmed, ...options } = {} } = tx
       const address = await this.getAddress()
       const addressHex = this._tronWeb.address.toHex(address)
 
       const { transaction } = await this._tronWeb.transactionBuilder
-        .triggerSmartContract(contractAddress, functionSelector, { feeLimit: DEFAULT_FEE_LIMIT_SUN, ...options }, parameters, addressHex)
+        .triggerSmartContract(contractAddress, functionSelector, { feeLimit: DEFAULT_FEE_LIMIT_SUN, ...options, txLocal: true, blockHeader: await this._getBlockHeader() }, parameters, addressHex)
 
       return transaction
     }
@@ -493,10 +503,33 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     if (to && value) {
       const address = await this.getAddress()
 
-      return await this._tronWeb.transactionBuilder.sendTrx(to, value, address)
+      return await this._tronWeb.transactionBuilder.sendTrx(to, value, address, { blockHeader: await this._getBlockHeader() })
     }
 
     throw new Error('Invalid transaction.')
+  }
+
+  /**
+   * Returns the reference block and validity window for a new transaction. The reference block is the node's latest
+   * block, and the transaction expires one minute after that block's time.
+   *
+   * @protected
+   * @returns {Promise<Partial<Transaction['raw_data']>>} The block header to build the transaction with.
+   * @throws {AssertionError} If the node's latest block is more than one minute ahead of the device clock.
+   */
+  async _getBlockHeader () {
+    const { ref_block_bytes: refBlockBytes, ref_block_hash: refBlockHash, timestamp } = await this._tronWeb.trx.getCurrentRefBlockParams()
+
+    if (timestamp > Date.now() + BLOCK_TIME_TOLERANCE_MS) {
+      throw new AssertionError("The node's latest block is ahead of the device clock.")
+    }
+
+    return {
+      ref_block_bytes: refBlockBytes,
+      ref_block_hash: refBlockHash,
+      expiration: timestamp + TRANSACTION_EXPIRATION_MS,
+      timestamp
+    }
   }
 
   /**

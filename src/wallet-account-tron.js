@@ -14,7 +14,7 @@
 
 'use strict'
 
-import { DisposalError, MaximumFeeExceededError, ProviderRequiredError } from '@tetherto/wdk-wallet'
+import { DisposalError, MaximumFeeExceededError, ProviderError, ProviderErrorReason, ProviderRequiredError } from '@tetherto/wdk-wallet'
 
 import WalletAccountReadOnlyTron from './wallet-account-read-only-tron.js'
 
@@ -55,6 +55,11 @@ import PrivateKeySignerTron from './signers/private-key-signer-tron.js'
 const DEFAULT_ACCOUNT_PATH = "0'/0/0"
 
 const DEFAULT_FEE_LIMIT_SUN = 15_000_000
+
+/**
+ * The broadcast reply code of a node that already holds the transaction, which means it was broadcast.
+ */
+const DUPLICATE_TRANSACTION_CODE = 'DUP_TRANSACTION_ERROR'
 
 /** @implements {IWalletAccount<TronSignedTransaction>} */
 export default class WalletAccountTron extends WalletAccountReadOnlyTron {
@@ -216,6 +221,7 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    * @throws {DisposalError} If the wallet account has been disposed.
    * @throws {MaximumFeeExceededError} If the transaction's cost exceeds the maximum transaction fee option.
    * @throws {ProviderRequiredError} If the wallet is not connected to tron web.
+   * @throws {AssertionError} If the node's latest block is more than one minute ahead of the device clock.
    */
   async signTransaction (tx) {
     this._guardDisposed()
@@ -240,6 +246,8 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    *
    * @param {TronTransaction | TronSignedTransaction} tx - The transaction, or a signed transaction.
    * @returns {Promise<Omit<TransactionResult, 'hash'> & TronActivationFee>} The transaction's quotes.
+   * @throws {ProviderRequiredError} If the wallet is not connected to tron web.
+   * @throws {AssertionError} If the node's latest block is more than one minute ahead of the device clock.
    */
   async quoteSendTransaction (tx) {
     return await super.quoteSendTransaction(tx)
@@ -253,6 +261,8 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    * @throws {DisposalError} If the wallet account has been disposed.
    * @throws {MaximumFeeExceededError} If the transaction's cost exceeds the maximum transaction fee option.
    * @throws {ProviderRequiredError} If the wallet is not connected to tron web.
+   * @throws {AssertionError} If the node's latest block is more than one minute ahead of the device clock.
+   * @throws {ProviderError} If the node refuses to broadcast the transaction.
    */
   async sendTransaction (tx) {
     this._guardDisposed()
@@ -269,9 +279,9 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
 
     this._assertFeeWithinLimit(fee, this._config.transactionMaxFee, 'Exceeded maximum fee cost for transaction operation.')
 
-    const { txid } = await this._tronWeb.trx.sendRawTransaction(signedTransaction)
+    const hash = await this._broadcastTransaction(signedTransaction)
 
-    return { hash: txid, fee, activationFee }
+    return { hash, fee, activationFee }
   }
 
   /**
@@ -284,6 +294,8 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    * @throws {MaximumFeeExceededError} If the transfer's cost exceeds the maximum transfer fee option.
    * @throws {TransferError} If the account's token balance is below the transfer amount.
    * @throws {ProviderRequiredError} If the wallet is not connected to tron web.
+   * @throws {AssertionError} If the node's latest block is more than one minute ahead of the device clock.
+   * @throws {ProviderError} If the node refuses to broadcast the transaction.
    */
   async transfer ({ token, recipient, amount }) {
     this._guardDisposed()
@@ -301,7 +313,9 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
 
     const options = {
       feeLimit: Number(fee) || DEFAULT_FEE_LIMIT_SUN,
-      callValue: 0
+      callValue: 0,
+      txLocal: true,
+      blockHeader: await this._getBlockHeader()
     }
 
     const parameters = [
@@ -314,9 +328,9 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
 
     const signedTransaction = await this._signTransaction(transaction)
 
-    const { txid } = await this._tronWeb.trx.sendRawTransaction(signedTransaction)
+    const hash = await this._broadcastTransaction(signedTransaction)
 
-    return { hash: txid, fee }
+    return { hash, fee }
   }
 
   /**
@@ -327,6 +341,8 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
    * @throws {DisposalError} If the wallet account has been disposed.
    * @throws {MaximumFeeExceededError} If the transaction's cost exceeds the maximum transaction fee option.
    * @throws {ProviderRequiredError} If the wallet is not connected to tron web.
+   * @throws {AssertionError} If the node's latest block is more than one minute ahead of the device clock.
+   * @throws {ProviderError} If the node refuses to broadcast the transaction.
    */
   async approve (options) {
     this._guardDisposed()
@@ -424,6 +440,17 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
     await this._assertTransactionOwner(transaction, isPrebuilt)
 
     return transaction
+  }
+
+  /** @private */
+  async _broadcastTransaction (signedTransaction) {
+    const { result, code, Error: error } = await this._tronWeb.trx.sendRawTransaction(signedTransaction)
+
+    if (result !== true && code !== DUPLICATE_TRANSACTION_CODE) {
+      throw new ProviderError(`The node refused the transaction (${code ?? error ?? 'no result'}).`, { reason: ProviderErrorReason.INTERNAL_SERVER_ERROR })
+    }
+
+    return signedTransaction.txID
   }
 
   /** @private */

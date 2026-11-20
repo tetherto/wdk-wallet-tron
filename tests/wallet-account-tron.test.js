@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals'
 
-import { MaximumFeeExceededError, ProviderRequiredError } from '@tetherto/wdk-wallet'
+import { AssertionError, MaximumFeeExceededError, ProviderError, ProviderErrorReason, ProviderRequiredError } from '@tetherto/wdk-wallet'
 import * as bip39 from 'bip39'
 
 import { TronWeb, Trx } from 'tronweb'
@@ -25,6 +25,7 @@ const sendRawTransactionMock = jest.fn()
 const getAccountMock = jest.fn()
 const getAccountResourcesMock = jest.fn()
 const getChainParametersMock = jest.fn()
+const getCurrentRefBlockParamsMock = jest.fn()
 
 const sendTrxMock = jest.fn()
 const triggerSmartContractMock = jest.fn()
@@ -39,7 +40,8 @@ jest.unstable_mockModule('tronweb', () => {
       sendRawTransaction: sendRawTransactionMock,
       getAccount: getAccountMock,
       getAccountResources: getAccountResourcesMock,
-      getChainParameters: getChainParametersMock
+      getChainParameters: getChainParametersMock,
+      getCurrentRefBlockParams: getCurrentRefBlockParamsMock
     }
 
     provider.transactionBuilder = {
@@ -82,11 +84,20 @@ const BUILT_RAW_DATA = {
   timestamp: 1699999000000
 }
 
+const DUMMY_REF_BLOCK_PARAMS = {
+  ref_block_bytes: '1234',
+  ref_block_hash: '0011223344556677',
+  expiration: 1_700_000_060_000,
+  timestamp: 1_700_000_000_000
+}
+
 describe('WalletAccountTron', () => {
   let account
 
   beforeEach(() => {
     jest.clearAllMocks()
+
+    getCurrentRefBlockParamsMock.mockResolvedValue(DUMMY_REF_BLOCK_PARAMS)
     account = new WalletAccountTron(SEED_PHRASE, "0'/0/0", {
       provider: 'https://tron.web.provider/'
     })
@@ -407,7 +418,7 @@ describe('WalletAccountTron', () => {
       await expect(accountWithMaxFee.signTransaction(TRANSACTION))
         .rejects.toStrictEqual(new MaximumFeeExceededError('Exceeded maximum fee cost for transaction operation.'))
 
-      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ACCOUNT.address)
+      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ACCOUNT.address, { blockHeader: DUMMY_REF_BLOCK_PARAMS })
       expect(getAccountMock).toHaveBeenCalledWith(TronWeb.address.toHex(TRANSACTION.to))
       expect(getAccountResourcesMock).toHaveBeenCalledWith(ACCOUNT.address)
     })
@@ -447,7 +458,7 @@ describe('WalletAccountTron', () => {
         signature: [EXPECTED_SIGNATURE]
       })
 
-      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ACCOUNT.address)
+      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ACCOUNT.address, { blockHeader: DUMMY_REF_BLOCK_PARAMS })
       expect(getAccountMock).toHaveBeenCalledWith(TronWeb.address.toHex(TRANSACTION.to))
       expect(getAccountResourcesMock).toHaveBeenCalledWith(ACCOUNT.address)
     })
@@ -487,7 +498,7 @@ describe('WalletAccountTron', () => {
         signature: [EXPECTED_SIGNATURE]
       })
 
-      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ACCOUNT.address)
+      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ACCOUNT.address, { blockHeader: DUMMY_REF_BLOCK_PARAMS })
       expect(getAccountMock).toHaveBeenCalledWith(TronWeb.address.toHex(TRANSACTION.to))
       expect(getAccountResourcesMock).toHaveBeenCalledWith(ACCOUNT.address)
     })
@@ -506,7 +517,77 @@ describe('WalletAccountTron', () => {
         signature: [EXPECTED_SIGNATURE]
       })
 
-      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ACCOUNT.address)
+      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ACCOUNT.address, { blockHeader: DUMMY_REF_BLOCK_PARAMS })
+    })
+
+    test('should expire the transaction one minute after a node block that is less than a minute ahead of the device clock', async () => {
+      const TRANSACTION = { to: RECIPIENT, value: 1_000_000 }
+      const BLOCK_TIMESTAMP = Date.now() + 30_000
+
+      getCurrentRefBlockParamsMock.mockResolvedValue({ ...DUMMY_REF_BLOCK_PARAMS, timestamp: BLOCK_TIMESTAMP })
+      sendTrxMock.mockResolvedValue(transferTx(RECIPIENT))
+
+      await account.signTransaction(TRANSACTION)
+
+      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ACCOUNT.address, {
+        blockHeader: {
+          ref_block_bytes: DUMMY_REF_BLOCK_PARAMS.ref_block_bytes,
+          ref_block_hash: DUMMY_REF_BLOCK_PARAMS.ref_block_hash,
+          expiration: BLOCK_TIMESTAMP + 60_000,
+          timestamp: BLOCK_TIMESTAMP
+        }
+      })
+    })
+
+    test('should throw if the node\'s latest block is more than a minute ahead of the device clock', async () => {
+      getCurrentRefBlockParamsMock.mockResolvedValue({ ...DUMMY_REF_BLOCK_PARAMS, timestamp: Date.now() + 3_600_000 })
+
+      await expect(account.signTransaction({ to: RECIPIENT, value: 1_000_000 }))
+        .rejects.toStrictEqual(new AssertionError("The node's latest block is ahead of the device clock."))
+
+      expect(sendTrxMock).not.toHaveBeenCalled()
+    })
+
+    test('should build a smart contract call locally and ignore the query options', async () => {
+      const CONTRACT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'
+      const CALL = {
+        contractAddress: CONTRACT,
+        functionSelector: 'approve(address,uint256)',
+        parameters: [{ type: 'address', value: RECIPIENT }, { type: 'uint256', value: 100 }],
+        options: { feeLimit: 20_000_000, _isConstant: true, estimateEnergy: true, confirmed: true }
+      }
+      const DUMMY_TRANSACTION = {
+        txID: '12a406f767b30e00b317758aa25fcddc0ff8a329b7cad741dd204676d0e6c5ce',
+        raw_data: {
+          contract: [{
+            type: 'TriggerSmartContract',
+            parameter: {
+              value: {
+                contract_address: TronWeb.address.toHex(CONTRACT),
+                owner_address: TronWeb.address.toHex(ACCOUNT.address),
+                data: 'deadbeef',
+                call_value: 0
+              }
+            }
+          }]
+        },
+        raw_data_hex: '0a' + '00'.repeat(200)
+      }
+      const SIGNATURE = 'b4273d17c4b46fb47d59b5aca2b4134cd83e02394a28bc4e86ffda7cbe1a21762b96e3af3d273d7e874153100fb2f1510f7e6579fa5ea9dde9107d4d15e1541100'
+
+      triggerSmartContractMock.mockResolvedValue({ transaction: DUMMY_TRANSACTION })
+
+      const signedTx = await account.signTransaction(CALL)
+
+      expect(signedTx).toEqual({ ...DUMMY_TRANSACTION, signature: [SIGNATURE] })
+
+      expect(triggerSmartContractMock).toHaveBeenCalledWith(
+        CONTRACT,
+        'approve(address,uint256)',
+        { feeLimit: 20_000_000, txLocal: true, blockHeader: DUMMY_REF_BLOCK_PARAMS },
+        CALL.parameters,
+        TronWeb.address.toHex(ACCOUNT.address)
+      )
     })
 
     test('should sign a consistent prebuilt transaction owned by the account', async () => {
@@ -608,12 +689,12 @@ describe('WalletAccountTron', () => {
 
     test('should successfully send a tronix transfer', async () => {
       const TRANSACTION = { to: RECIPIENT, value: 1_000_000 }
-      const DUMMY_TX_ID = 'abc123def456'
+      const DUMMY_TX_ID = '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f'
       const DUMMY_SEND_TRX_RESULT = transferTx(RECIPIENT)
       const EXPECTED_SIGNATURE = 'e2fbd0590d2a6150952afdcdb8c0b137a8828fe45dacc6f17f552b10234baa9231811488104983c4d4333ad51c90343801aa72e41b1d576719cc798c4c98546100'
 
       sendTrxMock.mockResolvedValue(DUMMY_SEND_TRX_RESULT)
-      sendRawTransactionMock.mockResolvedValue({ txid: DUMMY_TX_ID })
+      sendRawTransactionMock.mockResolvedValue({ result: true, txid: DUMMY_TX_ID })
       getAccountMock.mockResolvedValue({ address: RECIPIENT })
       getAccountResourcesMock.mockResolvedValue({
         freeNetLimit: 5000,
@@ -628,13 +709,48 @@ describe('WalletAccountTron', () => {
       expect(fee).toBe(0n)
       expect(activationFee).toBe(0n)
 
-      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ACCOUNT.address)
+      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ACCOUNT.address, { blockHeader: DUMMY_REF_BLOCK_PARAMS })
       expect(getAccountMock).toHaveBeenCalledWith(TronWeb.address.toHex(RECIPIENT))
       expect(getAccountResourcesMock).toHaveBeenCalledWith(ACCOUNT.address)
       expect(sendRawTransactionMock).toHaveBeenCalledWith({
         ...DUMMY_SEND_TRX_RESULT,
         signature: [EXPECTED_SIGNATURE]
       })
+    })
+
+    test('should throw if the node refuses the broadcast', async () => {
+      sendTrxMock.mockResolvedValue(transferTx(RECIPIENT))
+      sendRawTransactionMock.mockResolvedValue({ code: 'CONTRACT_VALIDATE_ERROR', txid: 'abc123def456', message: '42616c616e6365206973206e6f742073756666696369656e742e' })
+      getAccountMock.mockResolvedValue({ address: RECIPIENT })
+      getAccountResourcesMock.mockResolvedValue({ freeNetLimit: 5000, freeNetUsed: 0, NetLimit: 0, NetUsed: 0 })
+
+      await expect(account.sendTransaction({ to: RECIPIENT, value: 1_000_000 }))
+        .rejects.toStrictEqual(new ProviderError('The node refused the transaction (CONTRACT_VALIDATE_ERROR).', { reason: ProviderErrorReason.INTERNAL_SERVER_ERROR }))
+    })
+
+    test('should return the hash if the node already holds the transaction', async () => {
+      const DUMMY_SEND_TRX_RESULT = transferTx(RECIPIENT)
+
+      sendTrxMock.mockResolvedValue(DUMMY_SEND_TRX_RESULT)
+      sendRawTransactionMock.mockResolvedValue({ code: 'DUP_TRANSACTION_ERROR', txid: DUMMY_SEND_TRX_RESULT.txID, message: '5472616e73616374696f6e20616c7265616479206578697374732e' })
+      getAccountMock.mockResolvedValue({ address: RECIPIENT })
+      getAccountResourcesMock.mockResolvedValue({ freeNetLimit: 5000, freeNetUsed: 0, NetLimit: 0, NetUsed: 0 })
+
+      const { hash, fee, activationFee } = await account.sendTransaction({ to: RECIPIENT, value: 1_000_000 })
+
+      expect(hash).toBe(DUMMY_SEND_TRX_RESULT.txID)
+      expect(fee).toBe(0n)
+      expect(activationFee).toBe(0n)
+    })
+
+    test('should throw if the node fails to process the broadcast', async () => {
+      sendTrxMock.mockResolvedValue(transferTx(RECIPIENT))
+      sendRawTransactionMock.mockResolvedValue({ Error: 'class java.lang.NullPointerException : null' })
+      getAccountMock.mockResolvedValue({ address: RECIPIENT })
+      getAccountResourcesMock.mockResolvedValue({ freeNetLimit: 5000, freeNetUsed: 0, NetLimit: 0, NetUsed: 0 })
+
+      await expect(account.sendTransaction({ to: RECIPIENT, value: 1_000_000 }))
+        .rejects.toStrictEqual(new ProviderError('The node refused the transaction (class java.lang.NullPointerException : null).', { reason: ProviderErrorReason.INTERNAL_SERVER_ERROR }))
     })
 
     test('should successfully send a smart contract call', async () => {
@@ -645,7 +761,7 @@ describe('WalletAccountTron', () => {
         parameters: [{ type: 'address', value: RECIPIENT }, { type: 'uint256', value: 100 }],
         options: { feeLimit: 15_000_000 }
       }
-      const DUMMY_TX_ID = 'contractcall123'
+      const DUMMY_TX_ID = '12a406f767b30e00b317758aa25fcddc0ff8a329b7cad741dd204676d0e6c5ce'
       const DUMMY_TRANSACTION = {
         txID: '12a406f767b30e00b317758aa25fcddc0ff8a329b7cad741dd204676d0e6c5ce',
         raw_data: {
@@ -670,7 +786,7 @@ describe('WalletAccountTron', () => {
       triggerSmartContractMock.mockResolvedValue({ transaction: DUMMY_TRANSACTION })
 
       triggerConstantContractMock.mockResolvedValue({ energy_used: 10000 })
-      sendRawTransactionMock.mockResolvedValue({ txid: DUMMY_TX_ID })
+      sendRawTransactionMock.mockResolvedValue({ result: true, txid: DUMMY_TX_ID })
       getAccountResourcesMock.mockResolvedValue({
         freeNetLimit: 5000,
         freeNetUsed: 0,
@@ -690,7 +806,7 @@ describe('WalletAccountTron', () => {
       expect(triggerSmartContractMock).toHaveBeenCalledWith(
         CONTRACT,
         'approve(address,uint256)',
-        { feeLimit: 15_000_000 },
+        { feeLimit: 15_000_000, txLocal: true, blockHeader: DUMMY_REF_BLOCK_PARAMS },
         CALL.parameters,
         TronWeb.address.toHex(ACCOUNT.address)
       )
@@ -722,12 +838,12 @@ describe('WalletAccountTron', () => {
       const SIGNATURE = '35e63169bc6ac6ea82e1df9d1f70e1f90c820a01ce1ff14dce0a28efb66522aa1851011b8a2ce0488e50d0524c2d128b014ab55580d5ba5a238d9a65d6e5479700'
       const EXPECTED_FEE = 264_000n
 
-      sendRawTransactionMock.mockResolvedValue({ txid: 'freeze123' })
+      sendRawTransactionMock.mockResolvedValue({ result: true, txid: 'fa99c9a1f545f95246b98dba67211a62726f1204e60541ed7d00bae880b47e11' })
       getAccountResourcesMock.mockResolvedValue({ freeNetLimit: 0, freeNetUsed: 0, NetLimit: 0, NetUsed: 0 })
 
       const { hash, fee, activationFee } = await account.sendTransaction(PREBUILT)
 
-      expect(hash).toBe('freeze123')
+      expect(hash).toBe(PREBUILT.txID)
       expect(fee).toBe(EXPECTED_FEE)
       expect(activationFee).toBe(0n)
       expect(triggerConstantContractMock).not.toHaveBeenCalled()
@@ -762,7 +878,7 @@ describe('WalletAccountTron', () => {
 
     test('should broadcast an already-signed transaction', async () => {
       const RECIPIENT = 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD'
-      const DUMMY_TX_ID = 'abc123def456'
+      const DUMMY_TX_ID = '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f'
       const SIGNED_TX = {
         txID: '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f',
         raw_data_hex: '0a' + '00'.repeat(100),
@@ -772,7 +888,7 @@ describe('WalletAccountTron', () => {
         signature: ['deadbeef']
       }
 
-      sendRawTransactionMock.mockResolvedValue({ txid: DUMMY_TX_ID })
+      sendRawTransactionMock.mockResolvedValue({ result: true, txid: DUMMY_TX_ID })
 
       getAccountResourcesMock.mockResolvedValue({
         freeNetLimit: 5000,
@@ -823,7 +939,7 @@ describe('WalletAccountTron', () => {
       await expect(accountWithMaxFee.sendTransaction(TRANSACTION))
         .rejects.toStrictEqual(new MaximumFeeExceededError('Exceeded maximum fee cost for transaction operation.'))
 
-      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ACCOUNT.address)
+      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ACCOUNT.address, { blockHeader: DUMMY_REF_BLOCK_PARAMS })
       expect(getAccountMock).toHaveBeenCalledWith(TronWeb.address.toHex(TRANSACTION.to))
       expect(getAccountResourcesMock).toHaveBeenCalledWith(ACCOUNT.address)
     })
@@ -833,7 +949,7 @@ describe('WalletAccountTron', () => {
         to: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
         value: 1_000_000
       }
-      const DUMMY_TX_ID = 'abc123def456'
+      const DUMMY_TX_ID = '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f'
       const DUMMY_SEND_TRX_RESULT = {
         txID: '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f',
         raw_data: BUILT_RAW_DATA,
@@ -841,7 +957,7 @@ describe('WalletAccountTron', () => {
       }
 
       sendTrxMock.mockResolvedValue(DUMMY_SEND_TRX_RESULT)
-      sendRawTransactionMock.mockResolvedValue({ txid: DUMMY_TX_ID })
+      sendRawTransactionMock.mockResolvedValue({ result: true, txid: DUMMY_TX_ID })
 
       getAccountMock.mockResolvedValue({ address: TRANSACTION.to })
 
@@ -863,7 +979,7 @@ describe('WalletAccountTron', () => {
       expect(fee).toBe(245_000n)
       expect(activationFee).toBe(0n)
 
-      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ACCOUNT.address)
+      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ACCOUNT.address, { blockHeader: DUMMY_REF_BLOCK_PARAMS })
       expect(getAccountMock).toHaveBeenCalledWith(TronWeb.address.toHex(TRANSACTION.to))
       expect(getAccountResourcesMock).toHaveBeenCalledWith(ACCOUNT.address)
       expect(sendRawTransactionMock).toHaveBeenCalledWith({ ...DUMMY_SEND_TRX_RESULT, signature: ['e2fbd0590d2a6150952afdcdb8c0b137a8828fe45dacc6f17f552b10234baa9231811488104983c4d4333ad51c90343801aa72e41b1d576719cc798c4c98546100'] })
@@ -874,7 +990,7 @@ describe('WalletAccountTron', () => {
         to: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
         value: 1_000_000
       }
-      const DUMMY_TX_ID = 'abc123def456'
+      const DUMMY_TX_ID = '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f'
       const DUMMY_SEND_TRX_RESULT = {
         txID: '00c3473fec7876829fb623fb4ecb26dcb6b7e88cb5832384619bd6e5649eb44f',
         raw_data: BUILT_RAW_DATA,
@@ -882,7 +998,7 @@ describe('WalletAccountTron', () => {
       }
 
       sendTrxMock.mockResolvedValue(DUMMY_SEND_TRX_RESULT)
-      sendRawTransactionMock.mockResolvedValue({ txid: DUMMY_TX_ID })
+      sendRawTransactionMock.mockResolvedValue({ result: true, txid: DUMMY_TX_ID })
 
       getAccountMock.mockResolvedValue({ address: TRANSACTION.to })
 
@@ -904,7 +1020,7 @@ describe('WalletAccountTron', () => {
       expect(fee).toBe(245_000n)
       expect(activationFee).toBe(0n)
 
-      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ACCOUNT.address)
+      expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ACCOUNT.address, { blockHeader: DUMMY_REF_BLOCK_PARAMS })
       expect(getAccountMock).toHaveBeenCalledWith(TronWeb.address.toHex(TRANSACTION.to))
       expect(getAccountResourcesMock).toHaveBeenCalledWith(ACCOUNT.address)
       expect(sendRawTransactionMock).toHaveBeenCalledWith({ ...DUMMY_SEND_TRX_RESULT, signature: ['e2fbd0590d2a6150952afdcdb8c0b137a8828fe45dacc6f17f552b10234baa9231811488104983c4d4333ad51c90343801aa72e41b1d576719cc798c4c98546100'] })
@@ -924,7 +1040,7 @@ describe('WalletAccountTron', () => {
         recipient: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
         amount: 100_000_000
       }
-      const DUMMY_TX_ID = 'xyz789abc123'
+      const DUMMY_TX_ID = '12a406f767b30e00b317758aa25fcddc0ff8a329b7cad741dd204676d0e6c5ce'
 
       triggerConstantContractMock.mockResolvedValue({
         constant_result: ['0000000000000000000000000000000000000000000000000000000000000064'],
@@ -944,7 +1060,7 @@ describe('WalletAccountTron', () => {
         transaction: DUMMY_TRIGGER_SMART_CONTRACT_RESULT
       })
 
-      sendRawTransactionMock.mockResolvedValue({ txid: DUMMY_TX_ID })
+      sendRawTransactionMock.mockResolvedValue({ result: true, txid: DUMMY_TX_ID })
 
       getAccountResourcesMock.mockResolvedValue({
         freeNetLimit: 5000,
@@ -984,7 +1100,9 @@ describe('WalletAccountTron', () => {
         'transfer(address,uint256)',
         {
           feeLimit: 4_200_000,
-          callValue: 0
+          callValue: 0,
+          txLocal: true,
+          blockHeader: DUMMY_REF_BLOCK_PARAMS
         },
         [
           { type: 'address', value: TronWeb.address.toHex(TRANSFER.recipient) },
@@ -1045,6 +1163,47 @@ describe('WalletAccountTron', () => {
       expect(getChainParametersMock).toHaveBeenCalledWith()
     })
 
+    test('should throw if the node\'s latest block is more than a minute ahead of the device clock', async () => {
+      triggerConstantContractMock.mockResolvedValue({
+        constant_result: ['0000000000000000000000000000000000000000000000000000000000000064'],
+        energy_used: 10000,
+        transaction: { raw_data_hex: '0a' + '00'.repeat(200) }
+      })
+      getAccountResourcesMock.mockResolvedValue({ freeNetLimit: 5000, freeNetUsed: 0, NetLimit: 0, NetUsed: 0, EnergyLimit: 0, EnergyUsed: 0 })
+      getChainParametersMock.mockResolvedValue([{ key: 'getEnergyFee', value: 420 }])
+      getCurrentRefBlockParamsMock.mockResolvedValue({ ...DUMMY_REF_BLOCK_PARAMS, timestamp: Date.now() + 3_600_000 })
+
+      await expect(account.transfer({
+        token: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+        recipient: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
+        amount: 100_000_000
+      }))
+        .rejects.toStrictEqual(new AssertionError("The node's latest block is ahead of the device clock."))
+
+      expect(triggerSmartContractMock).not.toHaveBeenCalled()
+    })
+
+    test('should throw if the node refuses the broadcast', async () => {
+      triggerConstantContractMock.mockResolvedValue({
+        constant_result: ['0000000000000000000000000000000000000000000000000000000000000064'],
+        energy_used: 10000,
+        transaction: { raw_data_hex: '0a' + '00'.repeat(200) }
+      })
+      getAccountResourcesMock.mockResolvedValue({ freeNetLimit: 5000, freeNetUsed: 0, NetLimit: 0, NetUsed: 0, EnergyLimit: 0, EnergyUsed: 0 })
+      getChainParametersMock.mockResolvedValue([{ key: 'getEnergyFee', value: 420 }])
+      triggerSmartContractMock.mockResolvedValue({
+        transaction: { txID: '12a406f767b30e00b317758aa25fcddc0ff8a329b7cad741dd204676d0e6c5ce', raw_data_hex: '0a' + '00'.repeat(200) }
+      })
+      sendRawTransactionMock.mockResolvedValue({ code: 'CONTRACT_VALIDATE_ERROR', txid: '12a406f767b30e00b317758aa25fcddc0ff8a329b7cad741dd204676d0e6c5ce' })
+
+      await expect(account.transfer({
+        token: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+        recipient: 'TAibbFBAkcNioexXTFWKbp65mgLp7JiqHD',
+        amount: 100_000_000
+      }))
+        .rejects.toStrictEqual(new ProviderError('The node refused the transaction (CONTRACT_VALIDATE_ERROR).', { reason: ProviderErrorReason.INTERNAL_SERVER_ERROR }))
+    })
+
     test('should throw if the account is not connected to tron web', async () => {
       const disconnected = new WalletAccountTron(SEED_PHRASE, "0'/0/0")
       await expect(disconnected.transfer({
@@ -1062,7 +1221,7 @@ describe('WalletAccountTron', () => {
       amount: 100_000_000n
     }
 
-    const DUMMY_TX_ID = 'approvecall123'
+    const DUMMY_TX_ID = '12a406f767b30e00b317758aa25fcddc0ff8a329b7cad741dd204676d0e6c5ce'
 
     const DUMMY_TRANSACTION = {
       txID: '12a406f767b30e00b317758aa25fcddc0ff8a329b7cad741dd204676d0e6c5ce',
@@ -1088,7 +1247,7 @@ describe('WalletAccountTron', () => {
     beforeEach(() => {
       triggerSmartContractMock.mockResolvedValue({ transaction: DUMMY_TRANSACTION })
       triggerConstantContractMock.mockResolvedValue({ energy_used: 10000 })
-      sendRawTransactionMock.mockResolvedValue({ txid: DUMMY_TX_ID })
+      sendRawTransactionMock.mockResolvedValue({ result: true, txid: DUMMY_TX_ID })
       getAccountResourcesMock.mockResolvedValue({
         freeNetLimit: 5000,
         freeNetUsed: 0,
@@ -1111,7 +1270,7 @@ describe('WalletAccountTron', () => {
       expect(triggerSmartContractMock).toHaveBeenCalledWith(
         APPROVE.token,
         'approve(address,uint256)',
-        { feeLimit: 15_000_000 },
+        { feeLimit: 15_000_000, txLocal: true, blockHeader: DUMMY_REF_BLOCK_PARAMS },
         [
           { type: 'address', value: TronWeb.address.toHex(APPROVE.spender) },
           { type: 'uint256', value: '100000000' }
@@ -1133,7 +1292,7 @@ describe('WalletAccountTron', () => {
       expect(triggerSmartContractMock).toHaveBeenCalledWith(
         APPROVE.token,
         'approve(address,uint256)',
-        { feeLimit: 15_000_000 },
+        { feeLimit: 15_000_000, txLocal: true, blockHeader: DUMMY_REF_BLOCK_PARAMS },
         [
           { type: 'address', value: TronWeb.address.toHex(APPROVE.spender) },
           { type: 'uint256', value: '100000000' }
