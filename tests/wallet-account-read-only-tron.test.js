@@ -322,7 +322,7 @@ describe('WalletAccountReadOnlyTron', () => {
       expect(triggerSmartContractMock).toHaveBeenCalledWith(
         CONTRACT,
         'approve(address,uint256)',
-        { feeLimit: 15_000_000 },
+        { feeLimit: 15_000_000, txLocal: true },
         CALL.parameters,
         TronWeb.address.toHex(ADDRESS)
       )

@@ -301,7 +301,8 @@ export default class WalletAccountTron extends WalletAccountReadOnlyTron {
 
     const options = {
       feeLimit: Number(fee) || DEFAULT_FEE_LIMIT_SUN,
-      callValue: 0
+      callValue: 0,
+      txLocal: true
     }
 
     const parameters = [

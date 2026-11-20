@@ -55,7 +55,7 @@ import { TronWeb, Trx } from 'tronweb'
  * @property {string} contractAddress - The address of the smart contract to call.
  * @property {string} functionSelector - The function selector to invoke (e.g. 'transfer(address,uint256)').
  * @property {ContractFunctionParameter[]} [parameters] - The parameters to pass to the function (default: []).
- * @property {TriggerSmartContractOptions} [options] - The trigger options (e.g. `feeLimit`, `callValue`).
+ * @property {TriggerSmartContractOptions} [options] - The options the call is built with (e.g. `feeLimit`, `callValue`). The call is always built locally; the query options `_isConstant`, `estimateEnergy` and `confirmed` are ignored.
  */
 
 /**
@@ -478,12 +478,12 @@ export default class WalletAccountReadOnlyTron extends WalletAccountReadOnly {
     }
 
     if (WalletAccountReadOnlyTron._isSmartContractCall(tx)) {
-      const { contractAddress, functionSelector, parameters = [], options = {} } = tx
+      const { contractAddress, functionSelector, parameters = [], options: { _isConstant, estimateEnergy, confirmed, ...options } = {} } = tx
       const address = await this.getAddress()
       const addressHex = this._tronWeb.address.toHex(address)
 
       const { transaction } = await this._tronWeb.transactionBuilder
-        .triggerSmartContract(contractAddress, functionSelector, { feeLimit: DEFAULT_FEE_LIMIT_SUN, ...options }, parameters, addressHex)
+        .triggerSmartContract(contractAddress, functionSelector, { feeLimit: DEFAULT_FEE_LIMIT_SUN, ...options, txLocal: true }, parameters, addressHex)
 
       return transaction
     }

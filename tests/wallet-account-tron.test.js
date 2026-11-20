@@ -509,6 +509,48 @@ describe('WalletAccountTron', () => {
       expect(sendTrxMock).toHaveBeenCalledWith(TRANSACTION.to, TRANSACTION.value, ACCOUNT.address)
     })
 
+    test('should build a smart contract call locally and ignore the query options', async () => {
+      const CONTRACT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'
+      const CALL = {
+        contractAddress: CONTRACT,
+        functionSelector: 'approve(address,uint256)',
+        parameters: [{ type: 'address', value: RECIPIENT }, { type: 'uint256', value: 100 }],
+        options: { feeLimit: 20_000_000, _isConstant: true, estimateEnergy: true, confirmed: true }
+      }
+      const DUMMY_TRANSACTION = {
+        txID: '12a406f767b30e00b317758aa25fcddc0ff8a329b7cad741dd204676d0e6c5ce',
+        raw_data: {
+          contract: [{
+            type: 'TriggerSmartContract',
+            parameter: {
+              value: {
+                contract_address: TronWeb.address.toHex(CONTRACT),
+                owner_address: TronWeb.address.toHex(ACCOUNT.address),
+                data: 'deadbeef',
+                call_value: 0
+              }
+            }
+          }]
+        },
+        raw_data_hex: '0a' + '00'.repeat(200)
+      }
+      const SIGNATURE = 'b4273d17c4b46fb47d59b5aca2b4134cd83e02394a28bc4e86ffda7cbe1a21762b96e3af3d273d7e874153100fb2f1510f7e6579fa5ea9dde9107d4d15e1541100'
+
+      triggerSmartContractMock.mockResolvedValue({ transaction: DUMMY_TRANSACTION })
+
+      const signedTx = await account.signTransaction(CALL)
+
+      expect(signedTx).toEqual({ ...DUMMY_TRANSACTION, signature: [SIGNATURE] })
+
+      expect(triggerSmartContractMock).toHaveBeenCalledWith(
+        CONTRACT,
+        'approve(address,uint256)',
+        { feeLimit: 20_000_000, txLocal: true },
+        CALL.parameters,
+        TronWeb.address.toHex(ACCOUNT.address)
+      )
+    })
+
     test('should sign a consistent prebuilt transaction owned by the account', async () => {
       const signedTx = await account.signTransaction(CONSISTENT_PREBUILT_TX)
 
@@ -690,7 +732,7 @@ describe('WalletAccountTron', () => {
       expect(triggerSmartContractMock).toHaveBeenCalledWith(
         CONTRACT,
         'approve(address,uint256)',
-        { feeLimit: 15_000_000 },
+        { feeLimit: 15_000_000, txLocal: true },
         CALL.parameters,
         TronWeb.address.toHex(ACCOUNT.address)
       )
@@ -984,7 +1026,8 @@ describe('WalletAccountTron', () => {
         'transfer(address,uint256)',
         {
           feeLimit: 4_200_000,
-          callValue: 0
+          callValue: 0,
+          txLocal: true
         },
         [
           { type: 'address', value: TronWeb.address.toHex(TRANSFER.recipient) },
@@ -1111,7 +1154,7 @@ describe('WalletAccountTron', () => {
       expect(triggerSmartContractMock).toHaveBeenCalledWith(
         APPROVE.token,
         'approve(address,uint256)',
-        { feeLimit: 15_000_000 },
+        { feeLimit: 15_000_000, txLocal: true },
         [
           { type: 'address', value: TronWeb.address.toHex(APPROVE.spender) },
           { type: 'uint256', value: '100000000' }
@@ -1133,7 +1176,7 @@ describe('WalletAccountTron', () => {
       expect(triggerSmartContractMock).toHaveBeenCalledWith(
         APPROVE.token,
         'approve(address,uint256)',
-        { feeLimit: 15_000_000 },
+        { feeLimit: 15_000_000, txLocal: true },
         [
           { type: 'address', value: TronWeb.address.toHex(APPROVE.spender) },
           { type: 'uint256', value: '100000000' }

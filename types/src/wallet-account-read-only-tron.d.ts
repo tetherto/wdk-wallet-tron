@@ -277,7 +277,7 @@ export type TronSmartContractCall = {
      */
     parameters?: ContractFunctionParameter[];
     /**
-     * - The trigger options (e.g. `feeLimit`, `callValue`).
+     * - The options the call is built with (e.g. `feeLimit`, `callValue`). The call is always built locally; the query options `_isConstant`, `estimateEnergy` and `confirmed` are ignored.
      */
     options?: TriggerSmartContractOptions;
 };
