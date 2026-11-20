@@ -19,6 +19,7 @@ export type Transaction = import("./src/wallet-account-read-only-tron.js").Trans
 export type ContractFunctionParameter = import("./src/wallet-account-read-only-tron.js").ContractFunctionParameter;
 export type TriggerSmartContractOptions = import("./src/wallet-account-read-only-tron.js").TriggerSmartContractOptions;
 export type EstimateEnergyCostValue = import("./src/wallet-account-read-only-tron.js").EstimateEnergyCostValue;
+export type TronContractCosts = import("./src/wallet-account-read-only-tron.js").TronContractCosts;
 export type TronWalletConfig = import("./src/wallet-account-read-only-tron.js").TronWalletConfig;
 export type TronActivationFee = import("./src/wallet-account-read-only-tron.js").TronActivationFee;
 export type TronBandwidthCostOptions = import("./src/wallet-account-read-only-tron.js").TronBandwidthCostOptions;

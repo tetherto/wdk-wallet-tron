@@ -34,6 +34,7 @@
 /** @typedef {import('./src/wallet-account-read-only-tron.js').ContractFunctionParameter} ContractFunctionParameter */
 /** @typedef {import('./src/wallet-account-read-only-tron.js').TriggerSmartContractOptions} TriggerSmartContractOptions */
 /** @typedef {import('./src/wallet-account-read-only-tron.js').EstimateEnergyCostValue} EstimateEnergyCostValue */
+/** @typedef {import('./src/wallet-account-read-only-tron.js').TronContractCosts} TronContractCosts */
 /** @typedef {import('./src/wallet-account-read-only-tron.js').TronWalletConfig} TronWalletConfig */
 /** @typedef {import('./src/wallet-account-read-only-tron.js').TronActivationFee} TronActivationFee */
 /** @typedef {import('./src/wallet-account-read-only-tron.js').TronBandwidthCostOptions} TronBandwidthCostOptions */
