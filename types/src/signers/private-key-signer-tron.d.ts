@@ -74,6 +74,14 @@ export default class PrivateKeySignerTron implements ISignerTron {
      */
     signTransaction(unsignedTx: Transaction): Promise<SignedTransaction>;
     /**
+     * Signs typed data according to TIP-712.
+     *
+     * @param {TypedData} typedData - The typed data to sign.
+     * @returns {Promise<string>} The signature, as a 0x-prefixed 65-byte hex string (r ‖ s ‖ v, with v in {27, 28}).
+     * @throws {DisposalError} If the signer has been disposed.
+     */
+    signTypedData(typedData: TypedData): Promise<string>;
+    /**
      * Disposes the signer, erasing its internal copy of the private key from memory.
      */
     dispose(): void;
@@ -92,3 +100,4 @@ export type ISignerTron = import("./signer-tron.js").ISignerTron;
 export type KeyPair = import("@tetherto/wdk-wallet").KeyPair;
 export type Transaction = import("tronweb").Types.Transaction;
 export type SignedTransaction = import("tronweb").Types.SignedTransaction;
+export type TypedData = import("./signer-tron.js").TypedData;

@@ -41,6 +41,7 @@
 /** @typedef {import('./src/wallet-account-tron.js').TronSignedTransaction} TronSignedTransaction */
 /** @typedef {import('./src/wallet-account-tron.js').SignerOptions} SignerOptions */
 /** @typedef {import('./src/wallet-account-tron.js').ApproveOptions} ApproveOptions */
+/** @typedef {import('./src/signers/signer-tron.js').TypedData} TypedData */
 
 export { default } from './src/wallet-manager-tron.js'
 

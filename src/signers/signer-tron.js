@@ -14,7 +14,7 @@
 
 'use strict'
 
-import { TronWeb } from 'tronweb'
+import { TronWeb, utils as TronWebUtils } from 'tronweb'
 
 // eslint-disable-next-line camelcase
 import { keccak_256 } from '@noble/hashes/sha3'
@@ -27,6 +27,16 @@ import { ISigner, NotImplementedError, ValueError } from '@tetherto/wdk-wallet'
 
 /** @typedef {import('tronweb').Types.Transaction} Transaction */
 /** @typedef {import('tronweb').Types.SignedTransaction} SignedTransaction */
+
+/** @typedef {import('tronweb/utils').TypedDataDomain} TypedDataDomain */
+/** @typedef {import('tronweb/utils').TypedDataField} TypedDataField */
+
+/**
+ * @typedef {Object} TypedData
+ * @property {TypedDataDomain} domain - The domain separator. Its verifying contract, if any, is a base58 tron address.
+ * @property {Record<string, TypedDataField[]>} types - The type definitions.
+ * @property {Record<string, unknown>} message - The message data. Its address fields are base58 tron addresses.
+ */
 
 const ADDRESS_HASH_OFFSET_IN_BYTES = 12
 
@@ -135,6 +145,27 @@ export function signTransaction (privateKey, unsignedTx) {
 }
 
 /**
+ * Signs typed data with a raw secp256k1 private key, according to TIP-712.
+ *
+ * @internal
+ * @param {Uint8Array} privateKey - The raw private key (32 bytes).
+ * @param {TypedData} typedData - The typed data to sign.
+ * @returns {string} The signature, as a 0x-prefixed 65-byte hex string (r ‖ s ‖ v, with v in {27, 28}).
+ */
+export function signTypedData (privateKey, { domain, types, message }) {
+  const digest = TronWebUtils._TypedDataEncoder.hash(domain, types, message)
+  const digestBytes = Buffer.from(digest.slice(2), 'hex')
+
+  const signature = secp256k1.sign(digestBytes, privateKey, { lowS: true })
+
+  const r = signature.r.toString(16).padStart(64, '0')
+  const s = signature.s.toString(16).padStart(64, '0')
+  const v = (27 + signature.recovery).toString(16).padStart(2, '0')
+
+  return '0x' + r + s + v
+}
+
+/**
  * Interface for Tron signers.
  *
  * @interface
@@ -163,5 +194,16 @@ export class ISignerTron extends ISigner {
    */
   async signTransaction (unsignedTx) {
     throw new NotImplementedError('signTransaction(unsignedTx)')
+  }
+
+  /**
+   * Signs typed data according to TIP-712.
+   *
+   * @param {TypedData} typedData - The typed data to sign.
+   * @returns {Promise<string>} The signature, as a 0x-prefixed 65-byte hex string (r ‖ s ‖ v, with v in {27, 28}).
+   * @throws {DisposalError} If the signer has been disposed.
+   */
+  async signTypedData (typedData) {
+    throw new NotImplementedError('signTypedData(typedData)')
   }
 }

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globa
 import { AssertionError, MaximumFeeExceededError, ProviderError, ProviderErrorReason, ProviderRequiredError } from '@tetherto/wdk-wallet'
 import * as bip39 from 'bip39'
 
-import { TronWeb, Trx } from 'tronweb'
+import { TronWeb, Trx, utils } from 'tronweb'
 
 const SEED_PHRASE = 'cook voyage document eight skate token alien guide drink uncle term abuse'
 const INVALID_SEED_PHRASE = 'invalid seed phrase'
@@ -59,7 +59,8 @@ jest.unstable_mockModule('tronweb', () => {
 
   return {
     TronWeb: TronWebMock,
-    Trx
+    Trx,
+    utils
   }
 })
 

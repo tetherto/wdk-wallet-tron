@@ -1,5 +1,6 @@
 import { describe, expect, test } from '@jest/globals'
 import * as bip39 from 'bip39'
+import { Trx } from 'tronweb'
 
 import { DisposalError, ValueError } from '@tetherto/wdk-wallet'
 
@@ -36,6 +37,41 @@ const MESSAGE_SIGNATURE = '0x67b1e4bb9a9b070cd60776ceab1ff4d7c4d4997bb5b4a71757d
 const TRANSACTION = { txID: 'cbc59768e37a8d186165d94cb56579b8c76ec9b78239709c357e5d8ccaa59b38' }
 const ACCOUNT_0_TRANSACTION_SIGNATURE = '90772e79b238b0ce83446675f091e48a5ee7d3e76afcd830d21e91247aa9f7800d91038aaada318c28c6f01a2563a4a29b970bc651c9bdff5e7f70daf9a4f7e101'
 const ACCOUNT_1_TRANSACTION_SIGNATURE = '7a17bbb17bb8d9d15fcf12c2ad5c8677260b9ef3384c57dacf80b9c3372223e3603599606895f60d46abf25764351e32413519a94e2df46daa86848a62c8dccb00'
+
+const TYPED_DATA = {
+  domain: {
+    name: 'GasFreeController',
+    version: 'V1.0.0',
+    chainId: '728126428',
+    verifyingContract: 'TFFAMQLZybALaLb4uxHA9RBE7pxhUAjF3U'
+  },
+  types: {
+    PermitTransfer: [
+      { name: 'token', type: 'address' },
+      { name: 'serviceProvider', type: 'address' },
+      { name: 'user', type: 'address' },
+      { name: 'receiver', type: 'address' },
+      { name: 'value', type: 'uint256' },
+      { name: 'maxFee', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' },
+      { name: 'version', type: 'uint256' },
+      { name: 'nonce', type: 'uint256' }
+    ]
+  },
+  message: {
+    token: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+    serviceProvider: 'TKtWbdzEq5ss9vTS9kwRhBp5mXmBfBns3E',
+    user: 'TKtWbdzEq5ss9vTS9kwRhBp5mXmBfBns3E',
+    receiver: 'TKtWbdzEq5ss9vTS9kwRhBp5mXmBfBns3E',
+    value: '1',
+    maxFee: '1',
+    deadline: 1,
+    version: 1,
+    nonce: 0
+  }
+}
+
+const ACCOUNT_0_TYPED_DATA_SIGNATURE = '0x55f6da47fdff8b72a98ce5df22c782654de8fb7ddc07b3485e021723bf642a883e4a28926cb6c2c52e874a2a6f65823d01c870685413866c60654a9912d229ce1b'
 
 const DISPOSAL_ERROR = expect.objectContaining({ constructor: DisposalError, message: 'The signer has been disposed.' })
 
@@ -211,6 +247,23 @@ describe('SeedSignerTron', () => {
     })
   })
 
+  describe('signTypedData', () => {
+    test('should return the TIP-712 signature', async () => {
+      const signer = new SeedSignerTron(SEED_PHRASE, ACCOUNT_0.path)
+
+      expect(await signer.signTypedData(TYPED_DATA)).toBe(ACCOUNT_0_TYPED_DATA_SIGNATURE)
+    })
+
+    test('should return a signature that tronweb verifies', async () => {
+      const signer = new SeedSignerTron(SEED_PHRASE, ACCOUNT_0.path)
+      const { domain, types, message } = TYPED_DATA
+
+      const signature = await signer.signTypedData(TYPED_DATA)
+
+      expect(Trx.verifyTypedData(domain, types, message, signature, ACCOUNT_0.address)).toBe(true)
+    })
+  })
+
   describe('dispose', () => {
     test('should erase the private key', () => {
       const signer = new SeedSignerTron(SEED_PHRASE, ACCOUNT_0.path)
@@ -247,7 +300,8 @@ describe('SeedSignerTron', () => {
     test.each([
       ['derive', (signer) => signer.derive("0'/0/0")],
       ['sign', (signer) => signer.sign(MESSAGE)],
-      ['signTransaction', (signer) => signer.signTransaction(TRANSACTION)]
+      ['signTransaction', (signer) => signer.signTransaction(TRANSACTION)],
+      ['signTypedData', (signer) => signer.signTypedData(TYPED_DATA)]
     ])('should throw from %s once disposed', async (_, call) => {
       const signer = new SeedSignerTron(SEED_PHRASE)
 

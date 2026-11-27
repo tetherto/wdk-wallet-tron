@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals'
 
-import { TronWeb, Trx } from 'tronweb'
+import { TronWeb, Trx, utils } from 'tronweb'
 import { NoSuchElementError, ProviderRequiredError, TransferError, ValueError } from '@tetherto/wdk-wallet'
 
 const ADDRESS = 'TXngH8bVadn9ZWtKBgjKQcqN1GsZ7A1jcb'
@@ -49,7 +49,8 @@ jest.unstable_mockModule('tronweb', () => {
 
   return {
     TronWeb: TronWebMock,
-    Trx
+    Trx,
+    utils
   }
 })
 

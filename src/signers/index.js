@@ -14,6 +14,8 @@
 
 'use strict'
 
+/** @typedef {import('./signer-tron.js').TypedData} TypedData */
+
 export { ISignerTron } from './signer-tron.js'
 export { default as SeedSignerTron } from './seed-signer-tron.js'
 export { default as PrivateKeySignerTron } from './private-key-signer-tron.js'

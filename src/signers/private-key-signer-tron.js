@@ -21,12 +21,13 @@ import { sodium_memzero } from 'sodium-universal'
 
 import { DisposalError, UnsupportedOperationError, ValueError } from '@tetherto/wdk-wallet'
 
-import { getTronAddress, signMessage, signTransaction } from './signer-tron.js'
+import { getTronAddress, signMessage, signTransaction, signTypedData } from './signer-tron.js'
 
 /** @typedef {import('./signer-tron.js').ISignerTron} ISignerTron */
 /** @typedef {import('@tetherto/wdk-wallet').KeyPair} KeyPair */
 /** @typedef {import('tronweb').Types.Transaction} Transaction */
 /** @typedef {import('tronweb').Types.SignedTransaction} SignedTransaction */
+/** @typedef {import('./signer-tron.js').TypedData} TypedData */
 
 const HEX_PRIVATE_KEY_PATTERN = /^(0x)?[0-9a-fA-F]{64}$/
 
@@ -181,6 +182,19 @@ export default class PrivateKeySignerTron {
     this._guardDisposed()
 
     return signTransaction(this._rawPrivateKey, unsignedTx)
+  }
+
+  /**
+   * Signs typed data according to TIP-712.
+   *
+   * @param {TypedData} typedData - The typed data to sign.
+   * @returns {Promise<string>} The signature, as a 0x-prefixed 65-byte hex string (r ‖ s ‖ v, with v in {27, 28}).
+   * @throws {DisposalError} If the signer has been disposed.
+   */
+  async signTypedData (typedData) {
+    this._guardDisposed()
+
+    return signTypedData(this._rawPrivateKey, typedData)
   }
 
   /**
